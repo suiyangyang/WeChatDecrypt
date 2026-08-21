@@ -238,6 +238,10 @@ ClientBin/
 *.jfm
 *.pfx
 *.publishsettings
+
+# Environment variables and coverage output
+.env
+CodeCoverage/
 orleans.codegen.cs
 
 # Including strong name files can present a security risk
