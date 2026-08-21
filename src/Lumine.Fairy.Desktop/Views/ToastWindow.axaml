@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:p="using:Lumine.Fairy.Protocol"
+        x:Class="Lumine.Fairy.Desktop.Views.ToastWindow"
+        x:DataType="p:NotificationRecord"
+        Width="390" Height="154"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        WindowDecorations="None"
+        Background="Transparent">
+    <Border Background="#FCFEFF" BorderBrush="#D8E5F3" BorderThickness="1" CornerRadius="16" Padding="18">
+        <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="Auto,*,Auto">
+            <Border Width="34" Height="34" CornerRadius="10" Background="#0F6CBD">
+                <TextBlock Text="✦" Foreground="White" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" Foreground="#142033" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding Body}" Foreground="#3E4B60" TextWrapping="Wrap" MaxHeight="48" Margin="0,5,0,0"/>
+            </StackPanel>
+            <Button Grid.Column="2" Content="×" FontSize="18" Background="Transparent" Padding="5,0" Click="CloseClick"/>
+            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Source}" Foreground="#728096" FontSize="12" Margin="46,12,0,0"/>
+            <Button Grid.Row="2" Grid.Column="2" Content="查看" Foreground="#0F6CBD" Background="Transparent" Padding="8,2" Click="CloseClick"/>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,26 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Lumine.Fairy.Application/Lumine.Fairy.Application.csproj" />
+    <Project Path="src/Lumine.Fairy.Desktop/Lumine.Fairy.Desktop.csproj" />
+    <Project Path="src/Lumine.Fairy.Domain/Lumine.Fairy.Domain.csproj" />
+    <Project Path="src/Lumine.Fairy.Infrastructure/Lumine.Fairy.Infrastructure.csproj" />
+    <Project Path="src/Lumine.Fairy.Protocol/Lumine.Fairy.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Lumine.Fairy.Domain.Tests/Lumine.Fairy.Domain.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Lumine.Fairy.Diagnostics/Lumine.Fairy.Diagnostics.csproj" />
+  </Folder>
+  <Folder Name="/contact-management/">
+    <Project Path="Lumine.Fairy.AgentCore/Lumine.Fairy.AgentCore.csproj" />
+    <Project Path="Lumine.Fairy.ContactManagement.Abstractions/Lumine.Fairy.ContactManagement.Abstractions.csproj" />
+    <Project Path="Lumine.Fairy.ContactManagement.Core/Lumine.Fairy.ContactManagement.Core.csproj" />
+    <Project Path="Lumine.Fairy.ContactManagement.Infrastructure/Lumine.Fairy.ContactManagement.Infrastructure.csproj" />
+    <Project Path="Lumine.Fairy.ContactManagement.App/Lumine.Fairy.ContactManagement.App.csproj" />
+    <Project Path="Lumine.Fairy.TodoList.App/Lumine.Fairy.TodoList.App.csproj" />
+  </Folder>
+  <Folder Name="/contact-management-tests/">
+    <Project Path="Lumine.Fairy.ContactManagement.Tests/Lumine.Fairy.ContactManagement.Tests.csproj" />
+  </Folder>
+</Solution>

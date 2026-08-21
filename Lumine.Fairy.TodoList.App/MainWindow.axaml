@@ -1,0 +1,915 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Lumine.Fairy.TodoList.App.ViewModels"
+        x:Name="RootWindow"
+        x:Class="Lumine.Fairy.TodoList.App.MainWindow"
+        x:DataType="vm:TodoMainWindowViewModel"
+        Icon="avares://Lumine.Fairy.TodoList.App/Assets/todo-list.ico"
+        Width="1200"
+        Height="820"
+        FontFamily="NSimSun"
+        MinWidth="980"
+        MinHeight="680"
+        KeyDown="MainWindow_KeyDown"
+        Title="TodoList / 日报管理"
+        mc:Ignorable="d">
+  <Window.Styles>
+    <Style Selector="Button.view-switch">
+      <Setter Property="Background" Value="#F3F4F6" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.toolbar-action">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#F3F4F6" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="DatePicker.toolbar-date">
+      <Setter Property="Width" Value="132" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.view-switch:selected">
+      <Setter Property="Background" Value="#DBEAFE" />
+      <Setter Property="BorderBrush" Value="#60A5FA" />
+      <Setter Property="Foreground" Value="#1D4ED8" />
+    </Style>
+    <Style Selector="Button.report-browse-chip">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.report-browse-chip:pointerover">
+      <Setter Property="Background" Value="#EFF6FF" />
+      <Setter Property="BorderBrush" Value="#93C5FD" />
+      <Setter Property="Foreground" Value="#1D4ED8" />
+    </Style>
+    <Style Selector="Button.report-browse-chip:selected">
+      <Setter Property="Background" Value="#DBEAFE" />
+      <Setter Property="BorderBrush" Value="#60A5FA" />
+      <Setter Property="Foreground" Value="#1D4ED8" />
+    </Style>
+    <Style Selector="Button.report-browse-icon">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="MinWidth" Value="36" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Button.report-browse-action">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#475569" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.report-browse-action:pointerover">
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#94A3B8" />
+      <Setter Property="Foreground" Value="#1E293B" />
+    </Style>
+    <Style Selector="Button.report-browse-inline">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.report-browse-inline:pointerover">
+      <Setter Property="Background" Value="#EFF6FF" />
+      <Setter Property="BorderBrush" Value="#93C5FD" />
+      <Setter Property="Foreground" Value="#1D4ED8" />
+    </Style>
+    <Style Selector="TextBox.report-browse-search">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="12,6,38,6" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.report-browse-search-clear">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="#64748B" />
+    </Style>
+    <Style Selector="Button.report-browse-search-clear:pointerover">
+      <Setter Property="Background" Value="#F1F5F9" />
+      <Setter Property="Foreground" Value="#1E293B" />
+    </Style>
+  </Window.Styles>
+  <Grid RowDefinitions="Auto,*" Margin="12">
+    <Grid>
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="6">
+        <Border Padding="7,0"
+                Height="28"
+                VerticalAlignment="Center"
+                CornerRadius="8"
+                Background="#F3F4F6"
+                BorderBrush="#D1D5DB"
+                BorderThickness="1"
+                ToolTip.Tip="Todo / 日报">
+          <StackPanel Orientation="Horizontal" Spacing="5">
+            <PathIcon Width="14" Height="14" Data="M10,7.5H22C23.38,7.5 24.5,8.62 24.5,10V22C24.5,23.38 23.38,24.5 22,24.5H10C8.62,24.5 7.5,23.38 7.5,22V10C7.5,8.62 8.62,7.5 10,7.5Z M11,12.2L12.5,13.7L15,11.2M17.5,12.5H21M11,18.2L12.5,19.7L15,17.2M17.5,18.5H21" Foreground="#D8842B" />
+            <TextBlock Text="Todo" FontSize="11" FontWeight="SemiBold" Foreground="#92400E" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+        <DatePicker Grid.Column="1"
+                    Classes.toolbar-date="True"
+                    SelectedDate="{Binding TodoWorkDate}" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Width="32"
+                  Height="28"
+                  Padding="0"
+                  Classes.view-switch="True"
+                  Classes.selected="{Binding IsScratchNoteOnlyView}"
+                  Command="{Binding SetScratchNoteOnlyViewCommand}"
+              ToolTip.Tip="原始随手记">
+            <Viewbox Width="14" Height="14">
+              <Canvas Width="16" Height="16">
+                <Path Data="M3,2 L11,2 L13,4 L13,14 L3,14 Z"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4"
+                  Fill="Transparent" />
+                <Path Data="M10.5,2 L10.5,4.5 L13,4.5"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4"
+                  Fill="Transparent" />
+                <Path Data="M5,7 L11,7 M5,9.5 L11,9.5 M5,12 L9,12"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeLineCap="Round"
+                  StrokeThickness="1.2" />
+              </Canvas>
+            </Viewbox>
+              </Button>
+          <Button Width="32"
+                  Height="28"
+                  Padding="0"
+                  Classes.view-switch="True"
+                  Classes.selected="{Binding IsFormattedOnlyView}"
+                  Command="{Binding SetFormattedOnlyViewCommand}"
+              ToolTip.Tip="格式化结果">
+            <Viewbox Width="14" Height="14">
+              <Canvas Width="16" Height="16">
+                <Path Data="M4,3 L12,3 L12,14 L4,14 Z"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4"
+                  Fill="Transparent" />
+                <Path Data="M6,1.8 L10,1.8 L10,4 L6,4 Z"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.2"
+                  Fill="Transparent" />
+                <Path Data="M6,7 L10.5,7 M6,9.5 L10.5,9.5 M6,12 L9,12"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeLineCap="Round"
+                  StrokeThickness="1.2" />
+              </Canvas>
+            </Viewbox>
+              </Button>
+          <Button Width="32"
+                  Height="28"
+                  Padding="0"
+                  Classes.view-switch="True"
+                  Classes.selected="{Binding IsCompareView}"
+                  Command="{Binding SetCompareViewCommand}"
+              ToolTip.Tip="左右对照">
+            <Viewbox Width="14" Height="14">
+              <Canvas Width="16" Height="16">
+                <Path Data="M2.5,3 L13.5,3 L13.5,13 L2.5,13 Z"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4"
+                  Fill="Transparent" />
+                <Path Data="M8,3 L8,13"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeThickness="1.4" />
+                <Path Data="M4.5,5.5 L6.5,5.5 M4.5,8 L6.5,8 M9.5,5.5 L11.5,5.5 M9.5,8 L11.5,8"
+                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                  StrokeLineCap="Round"
+                  StrokeThickness="1.1" />
+              </Canvas>
+            </Viewbox>
+              </Button>
+          <Border Padding="8,4"
+                  CornerRadius="999"
+                  Background="#EFF6FF"
+                  BorderBrush="#BFDBFE"
+                  BorderThickness="1"
+                  ToolTip.Tip="F8 切换布局">
+            <TextBlock FontSize="11" Foreground="#1D4ED8" Text="F8切换布局" />
+          </Border>
+        </StackPanel>
+          <Button Grid.Column="4"
+              Classes.toolbar-action="True"
+              Command="{Binding SetTodoDateToTodayCommand}"
+              ToolTip.Tip="今天">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M3,4 L13,4 L13,13 L3,13 Z M5,2.7 L5,5.2 M11,2.7 L11,5.2 M3,6.6 L13,6.6"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              StrokeLineCap="Round"
+              Fill="Transparent" />
+            <Path Data="M5.4,9.2 L7.1,10.9 L10.6,7.6"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              StrokeLineCap="Round" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+          <Button Grid.Column="5"
+              Classes.toolbar-action="True"
+              Command="{Binding ParseScratchNoteCommand}"
+              ToolTip.Tip="解析并归置">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M3.2,2.8 L9.6,2.8 L12.4,5.6 L12.4,13.2 L3.2,13.2 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M9.6,2.8 L9.6,5.8 L12.4,5.8"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M5.1,8.1 L8.8,8.1 M5.1,10.5 L7.8,10.5"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              StrokeLineCap="Round" />
+            <Path Data="M9.7,8.1 L12.6,8.1 M11.2,6.7 L12.6,8.1 L11.2,9.5"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              StrokeLineCap="Round" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+          <Button Grid.Column="6"
+              Classes.toolbar-action="True"
+              Command="{Binding SaveTodoWorkspaceCommand}"
+              IsEnabled="{Binding !IsBusy}"
+              ToolTip.Tip="立即保存">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M3,2.8 L11.4,2.8 L13,4.4 L13,13.2 L3,13.2 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M5,2.8 L5,6.4 L10.3,6.4 L10.3,2.8"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              Fill="Transparent" />
+            <Path Data="M5.3,9 L10.7,9 M5.3,10.5 L10.7,10.5 M5.3,12 L9.2,12"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              StrokeLineCap="Round" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+          <Button Grid.Column="7"
+              Classes.toolbar-action="True"
+              Click="CopyDailyReport_Click"
+              IsEnabled="{Binding HasFormattedDailyReportText}"
+              ToolTip.Tip="复制日报">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M5.4,4 L12.2,4 L12.2,13 L5.4,13 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M3.2,2.8 L10,2.8 L10,4"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M3.2,5 L9.8,5 L9.8,12 M4.7,3.5 L11.5,3.5 L11.5,10.5 M6.6,6.6 L10.4,6.6 M6.6,9 L10.4,9"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              StrokeLineCap="Round" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+          <Button Grid.Column="8"
+              Classes.toolbar-action="True"
+              Command="{Binding OpenHistoryWindowCommand}"
+              ToolTip.Tip="历史记录">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M2,4 L14,4 L14,12 L2,12 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M4,2 L12,2 L12,4 L10,4 L10,2"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.25"
+              Fill="Transparent" />
+            <Path Data="M6,6 L10,6 M6,8 L10,8 M6,10 L8,10"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.2"
+              StrokeLineCap="Round" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+          <Button Grid.Column="9"
+              Classes.toolbar-action="True"
+              Command="{Binding OpenSettingsWindowCommand}"
+              ToolTip.Tip="设置">
+            <Viewbox Width="13" Height="13">
+          <Canvas Width="16" Height="16">
+            <Path Data="M8,2.6 L9.1,3.2 L10.4,2.9 L11.2,4 L12.5,4.4 L12.5,5.7 L13.4,6.7 L12.8,7.8 L13.4,9 L12.5,10 L12.5,11.3 L11.2,11.7 L10.4,12.8 L9.1,12.5 L8,13.1 L6.9,12.5 L5.6,12.8 L4.8,11.7 L3.5,11.3 L3.5,10 L2.6,9 L3.2,7.8 L2.6,6.7 L3.5,5.7 L3.5,4.4 L4.8,4 L5.6,2.9 L6.9,3.2 Z"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.1"
+              Fill="Transparent" />
+            <Path Data="M8,6.2 A1.8,1.8 0 1 1 7.99,6.2"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+              StrokeThickness="1.1"
+              Fill="Transparent" />
+          </Canvas>
+            </Viewbox>
+          </Button>
+      </Grid>
+    </Grid>
+
+    <Grid Grid.Row="1" Margin="0,8,0,0" RowDefinitions="*,Auto" RowSpacing="8">
+      <Grid>
+        <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10" IsVisible="{Binding IsScratchNoteOnlyView}">
+          <TextBox AcceptsReturn="True"
+                   TextWrapping="Wrap"
+                   Loaded="DailyTodoEditor_Loaded"
+                   PropertyChanged="ScratchEditor_PropertyChanged"
+                   VerticalContentAlignment="Top"
+                   VerticalAlignment="Stretch"
+                   Watermark="每日 Todo 写在最上方，用 ====== 分隔不同区域。&#10;例如：&#10;3/25&#10;1.Lumine.Fairy: 完成联系人 Todo 页签 1h&#10;2.Lumine.Fairy: 联调日报导出 ← 0.5&#10;======&#10;临时问题...&#10;======&#10;长期 Todo..."
+                   KeyDown="ScratchEditor_KeyDown"
+                   Text="{Binding ScratchNoteText}" />
+        </Border>
+
+        <ScrollViewer IsVisible="{Binding IsFormattedOnlyView}">
+          <StackPanel Spacing="8">
+            <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+              <StackPanel Spacing="8">
+                <StackPanel Spacing="2">
+                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding TodayTodoTitle}" />
+                  <TextBlock FontSize="11" Foreground="#6B7280" Text="可直接微调项目、内容、状态、工时。" />
+                </StackPanel>
+                <Border IsVisible="{Binding HasMissingDailyWorkHours}" Padding="8,6" CornerRadius="8" Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1">
+                  <TextBlock FontSize="11" Foreground="#92400E" Text="{Binding MissingDailyWorkHoursHintText}" TextWrapping="Wrap" />
+                </Border>
+                <ItemsControl ItemsSource="{Binding DailyTodoEntries}" IsVisible="{Binding HasDailyTodoEntries}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TodoEntryItemViewModel">
+                      <Border Margin="0,0,0,6" Padding="8" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                        <Grid ColumnDefinitions="1.1*,1.8*,130,88" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                          <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
+                                    IsEditable="True"
+                                    Text="{Binding ProjectName}"
+                                    GotFocus="ProjectNameEditor_GotFocus"
+                                    Loaded="TodoProjectNameEditor_Loaded" />
+                          <TextBox Grid.Column="1" Watermark="内容" Text="{Binding Content}" />
+                          <ComboBox Grid.Column="2" ItemsSource="{Binding #RootWindow.DataContext.TodoStatusOptions}" SelectedItem="{Binding Status}" />
+                          <TextBox Grid.Column="3" Watermark="工时" Text="{Binding WorkHoursText}" />
+                          <TextBox Grid.Row="1" Grid.ColumnSpan="3" Watermark="标题 / 备注" Text="{Binding Title}" />
+                          <CheckBox Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center" Content="日报项" IsChecked="{Binding IsDaily}" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border IsVisible="{Binding !HasDailyTodoEntries}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                  <TextBlock FontSize="11" Foreground="#64748B" Text="当前没有识别到今日 Todo，可继续输入随手记或点击“解析并归置”。" TextWrapping="Wrap" />
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="16" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10" IsVisible="False">
+              <StackPanel Spacing="12">
+                <StackPanel Spacing="4">
+                  <TextBlock FontSize="18" FontWeight="SemiBold" Text="客户问题" />
+                  <TextBlock Foreground="#6B7280" Text="按客户 / 项目块展示，不包含工时输入。" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding ClientIssueEntries}" IsVisible="{Binding HasClientIssues}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ClientIssueEntryItemViewModel">
+                      <Border Margin="0,0,0,10" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                        <StackPanel Spacing="8">
+                          <TextBlock FontWeight="SemiBold" Text="{Binding DisplayTitle}" TextWrapping="Wrap" />
+                          <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <StackPanel Spacing="6">
+                              <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
+                                        IsEditable="True"
+                                        Text="{Binding ProjectName}"
+                                        GotFocus="ProjectNameEditor_GotFocus"
+                                        Loaded="ClientIssueProjectNameEditor_Loaded" />
+                              <TextBlock Foreground="#64748B" Text="问题" />
+                              <TextBox AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding IssueLinesText}" MinHeight="72" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                              <TextBlock Foreground="#64748B" Text="方案" />
+                              <TextBox AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding SolutionLinesText}" MinHeight="72" />
+                            </StackPanel>
+                          </Grid>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border IsVisible="{Binding !HasClientIssues}" Padding="12" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                  <TextBlock Foreground="#64748B" Text="识别到的客户问题会集中展示在这里。" />
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+              <StackPanel Spacing="8">
+                <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报预览" />
+                <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="84" Text="{Binding FormattedDailyReportText}" />
+                <StackPanel Spacing="6" IsVisible="False">
+                  <TextBlock FontWeight="SemiBold" Text="未归类片段" />
+                  <ItemsControl ItemsSource="{Binding UnclassifiedFragments}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:UnclassifiedFragmentItemViewModel">
+                        <Border Margin="0,0,0,8" Padding="10" CornerRadius="8" Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1">
+                          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <Button Grid.Column="1"
+                                    Content="转为 Todo"
+                                    Command="{Binding #RootWindow.DataContext.ClassifyFragmentAsTodoCommand}"
+                                    CommandParameter="{Binding .}"
+                                    MinWidth="84" />
+                            <Button Grid.Column="2"
+                                    Content="转为客户问题"
+                                    Command="{Binding #RootWindow.DataContext.ClassifyFragmentAsClientIssueCommand}"
+                                    CommandParameter="{Binding .}"
+                                    MinWidth="104" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+              <StackPanel Spacing="8">
+                <StackPanel Spacing="2">
+                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报浏览" />
+                  <TextBlock FontSize="11" Foreground="#6B7280" Text="按选中日期查看近 7 天或近 31 天日报，并可跳回当天原始随手记。" TextWrapping="Wrap" />
+                </StackPanel>
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+                  <Button Classes.report-browse-chip="True"
+                          Classes.report-browse-icon="True"
+                          Classes.selected="{Binding IsWeekBrowseScope}"
+                          Command="{Binding SetWeekBrowseScopeCommand}"
+                          ToolTip.Tip="近 7 天">
+                    <Viewbox Width="12" Height="12">
+                      <Canvas Width="16" Height="16">
+                        <Path Data="M3,4.2 L13,4.2 L13,13 L3,13 Z M5.2,2.8 L5.2,5 M10.8,2.8 L10.8,5 M3,6.5 L13,6.5 M5,8.6 L7.2,8.6 M5,10.6 L9.4,10.6"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.2"
+                              StrokeLineCap="Round"
+                              Fill="Transparent" />
+                      </Canvas>
+                    </Viewbox>
+                  </Button>
+                  <Button Grid.Column="1"
+                          Classes.report-browse-chip="True"
+                          Classes.report-browse-icon="True"
+                          Classes.selected="{Binding IsMonthBrowseScope}"
+                          Command="{Binding SetMonthBrowseScopeCommand}"
+                          ToolTip.Tip="近 31 天">
+                    <Viewbox Width="12" Height="12">
+                      <Canvas Width="16" Height="16">
+                        <Path Data="M3,4.2 L13,4.2 L13,13 L3,13 Z M5.2,2.8 L5.2,5 M10.8,2.8 L10.8,5 M3,6.5 L13,6.5 M5,8.6 L7.2,8.6 M8.8,8.6 L11,8.6 M5,10.6 L7.2,10.6 M8.8,10.6 L11,10.6"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.2"
+                              StrokeLineCap="Round"
+                              Fill="Transparent" />
+                      </Canvas>
+                    </Viewbox>
+                  </Button>
+                  <Button Grid.Column="2"
+                          Classes.report-browse-action="True"
+                          Classes.report-browse-icon="True"
+                          Command="{Binding UploadRecentWeekDailyReportsCommand}"
+                          IsEnabled="{Binding !IsBusy}"
+                      ToolTip.Tip="{Binding UploadDailyReportsToolTipText}">
+                    <Viewbox Width="12" Height="12">
+                      <Canvas Width="16" Height="16">
+                        <Path Data="M8,3.2 L8,10.2 M5.6,7.8 L8,10.2 L10.4,7.8 M3.5,12.8 L12.5,12.8 M4.5,12.8 L4.5,10.8 M11.5,12.8 L11.5,10.8"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.25"
+                              StrokeLineCap="Round"
+                              Fill="Transparent" />
+                      </Canvas>
+                    </Viewbox>
+                  </Button>
+                  <Grid Grid.Column="3">
+                    <TextBox Classes.report-browse-search="True"
+                             Watermark="搜索项目名 / 正文 / 日期"
+                             Text="{Binding DailyReportBrowseSearchText}" />
+                    <Button Classes.report-browse-search-clear="True"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Margin="0,0,6,0"
+                            Command="{Binding ClearDailyReportBrowseSearchCommand}"
+                            ToolTip.Tip="清空搜索">
+                      <Viewbox Width="11" Height="11">
+                        <Canvas Width="16" Height="16">
+                          <Path Data="M5,5 L11,11 M11,5 L5,11"
+                                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                StrokeThickness="1.35"
+                                StrokeLineCap="Round" />
+                        </Canvas>
+                      </Viewbox>
+                    </Button>
+                  </Grid>
+                  <Button Grid.Column="4"
+                          Classes.report-browse-action="True"
+                          Classes.report-browse-icon="True"
+                          Command="{Binding ToggleAllBrowseReportsExpandedCommand}"
+                          ToolTip.Tip="{Binding BrowseExpandAllButtonText}">
+                    <Viewbox Width="12" Height="12">
+                      <Canvas Width="16" Height="16">
+                        <Path Data="{Binding BrowseExpandAllIconPathData}"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="1.25"
+                              StrokeLineCap="Round"
+                              Fill="Transparent" />
+                      </Canvas>
+                    </Viewbox>
+                  </Button>
+                </Grid>
+                <TextBlock FontSize="11"
+                           Foreground="#64748B"
+                           Text="{Binding DefaultUploadRangePreviewText}"
+                           TextWrapping="Wrap" />
+                <Border Padding="8,6" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                  <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding BrowseRangeTitle}" />
+                </Border>
+                <ItemsControl ItemsSource="{Binding BrowseReports}" IsVisible="{Binding HasBrowseReports}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DailyReportBrowseItemViewModel">
+                      <Border Margin="0,0,0,6" Padding="8" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <StackPanel Spacing="1">
+                              <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding SummaryText}" TextWrapping="Wrap" />
+                              <TextBlock FontSize="11" Foreground="#6B7280" Text="{Binding PreviewText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Classes.report-browse-inline="True"
+                                    Classes.report-browse-icon="True"
+                                    Command="{Binding #RootWindow.DataContext.ToggleBrowseReportExpandedCommand}"
+                                    CommandParameter="{Binding .}"
+                                    ToolTip.Tip="{Binding ExpandButtonText}">
+                              <Viewbox Width="12" Height="12">
+                                <Canvas Width="16" Height="16">
+                                  <Path Data="{Binding ExpandIconPathData}"
+                                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                        StrokeThickness="1.25"
+                                        StrokeLineCap="Round"
+                                        Fill="Transparent" />
+                                </Canvas>
+                              </Viewbox>
+                            </Button>
+                          </Grid>
+                          <Border IsVisible="{Binding IsExpanded}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                            <StackPanel Spacing="6">
+                              <TextBlock FontSize="12" FontWeight="SemiBold" Text="完整日报" />
+                              <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="88" Text="{Binding FormattedReportText}" />
+                            </StackPanel>
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border IsVisible="{Binding !HasBrowseReports}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                  <TextBlock FontSize="11" Foreground="#64748B" Text="当前范围内还没有日报记录，先保存几天数据后这里会自动展示。" TextWrapping="Wrap" />
+                </Border>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+
+        <Grid ColumnDefinitions="1.15*,Auto,*" IsVisible="{Binding IsCompareView}">
+          <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+            <TextBox AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     Loaded="DailyTodoEditor_Loaded"
+                     PropertyChanged="ScratchEditor_PropertyChanged"
+                     VerticalContentAlignment="Top"
+                     VerticalAlignment="Stretch"
+                     Watermark="每日 Todo 写在最上方，用 ====== 分隔不同区域。"
+                     KeyDown="ScratchEditor_KeyDown"
+                     Text="{Binding ScratchNoteText}" />
+          </Border>
+
+          <GridSplitter Grid.Column="1"
+                        Width="8"
+                        Background="#E5E7EB"
+                        ResizeDirection="Columns"
+                        ResizeBehavior="PreviousAndNext"
+                        ShowsPreview="True" />
+
+          <ScrollViewer Grid.Column="2">
+            <StackPanel Spacing="8">
+              <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+                <StackPanel Spacing="8">
+                  <StackPanel Spacing="2">
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding TodayTodoTitle}" />
+                    <TextBlock FontSize="11" Foreground="#6B7280" Text="可直接微调项目、内容、状态、工时。" />
+                  </StackPanel>
+                  <Border IsVisible="{Binding HasMissingDailyWorkHours}" Padding="8,6" CornerRadius="8" Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1">
+                    <TextBlock FontSize="11" Foreground="#92400E" Text="{Binding MissingDailyWorkHoursHintText}" TextWrapping="Wrap" />
+                  </Border>
+                  <ItemsControl ItemsSource="{Binding DailyTodoEntries}" IsVisible="{Binding HasDailyTodoEntries}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TodoEntryItemViewModel">
+                        <Border Margin="0,0,0,6" Padding="8" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                          <Grid ColumnDefinitions="1.1*,1.8*,130,88" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                            <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
+                                      IsEditable="True"
+                                      Text="{Binding ProjectName}"
+                                      GotFocus="ProjectNameEditor_GotFocus"
+                                      Loaded="TodoProjectNameEditor_Loaded" />
+                            <TextBox Grid.Column="1" Watermark="内容" Text="{Binding Content}" />
+                            <ComboBox Grid.Column="2" ItemsSource="{Binding #RootWindow.DataContext.TodoStatusOptions}" SelectedItem="{Binding Status}" />
+                            <TextBox Grid.Column="3" Watermark="工时" Text="{Binding WorkHoursText}" />
+                            <TextBox Grid.Row="1" Grid.ColumnSpan="3" Watermark="标题 / 备注" Text="{Binding Title}" />
+                            <CheckBox Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center" Content="日报项" IsChecked="{Binding IsDaily}" />
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border IsVisible="{Binding !HasDailyTodoEntries}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                    <TextBlock FontSize="11" Foreground="#64748B" Text="当前没有识别到今日 Todo，可继续输入随手记或点击“解析并归置”。" TextWrapping="Wrap" />
+                  </Border>
+                </StackPanel>
+              </Border>
+
+              <Border Padding="16" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10" IsVisible="False">
+                <StackPanel Spacing="12">
+                  <StackPanel Spacing="4">
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="客户问题" />
+                    <TextBlock Foreground="#6B7280" Text="按客户 / 项目块展示，不包含工时输入。" />
+                  </StackPanel>
+                  <ItemsControl ItemsSource="{Binding ClientIssueEntries}" IsVisible="{Binding HasClientIssues}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ClientIssueEntryItemViewModel">
+                        <Border Margin="0,0,0,10" Padding="12" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                          <StackPanel Spacing="8">
+                            <TextBlock FontWeight="SemiBold" Text="{Binding DisplayTitle}" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                              <StackPanel Spacing="6">
+                                <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
+                                          IsEditable="True"
+                                          Text="{Binding ProjectName}"
+                                          GotFocus="ProjectNameEditor_GotFocus"
+                                          Loaded="ClientIssueProjectNameEditor_Loaded" />
+                                <TextBlock Foreground="#64748B" Text="问题" />
+                                <TextBox AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding IssueLinesText}" MinHeight="72" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Foreground="#64748B" Text="方案" />
+                                <TextBox AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding SolutionLinesText}" MinHeight="72" />
+                              </StackPanel>
+                            </Grid>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border IsVisible="{Binding !HasClientIssues}" Padding="12" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                    <TextBlock Foreground="#64748B" Text="识别到的客户问题会集中展示在这里。" />
+                  </Border>
+                </StackPanel>
+              </Border>
+
+              <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+                <StackPanel Spacing="8">
+                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报预览" />
+                  <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="84" Text="{Binding FormattedDailyReportText}" />
+                  <StackPanel Spacing="6" IsVisible="False">
+                    <TextBlock FontWeight="SemiBold" Text="未归类片段" />
+                    <ItemsControl ItemsSource="{Binding UnclassifiedFragments}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UnclassifiedFragmentItemViewModel">
+                          <Border Margin="0,0,0,8" Padding="10" CornerRadius="8" Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1">
+                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                              <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                              <Button Grid.Column="1"
+                                      Content="转为 Todo"
+                                      Command="{Binding #RootWindow.DataContext.ClassifyFragmentAsTodoCommand}"
+                                      CommandParameter="{Binding .}"
+                                      MinWidth="84" />
+                              <Button Grid.Column="2"
+                                      Content="转为客户问题"
+                                      Command="{Binding #RootWindow.DataContext.ClassifyFragmentAsClientIssueCommand}"
+                                      CommandParameter="{Binding .}"
+                                      MinWidth="104" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+
+              <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+                <StackPanel Spacing="8">
+                  <StackPanel Spacing="2">
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报浏览" />
+                    <TextBlock FontSize="11" Foreground="#6B7280" Text="按选中日期查看近 7 天或近 31 天日报，并可跳回当天原始随手记。" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+                    <Button Classes.report-browse-chip="True"
+                            Classes.report-browse-icon="True"
+                            Classes.selected="{Binding IsWeekBrowseScope}"
+                            Command="{Binding SetWeekBrowseScopeCommand}"
+                            ToolTip.Tip="近 7 天">
+                      <Viewbox Width="12" Height="12">
+                        <Canvas Width="16" Height="16">
+                          <Path Data="M3,4.2 L13,4.2 L13,13 L3,13 Z M5.2,2.8 L5.2,5 M10.8,2.8 L10.8,5 M3,6.5 L13,6.5 M5,8.6 L7.2,8.6 M5,10.6 L9.4,10.6"
+                                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                StrokeThickness="1.2"
+                                StrokeLineCap="Round"
+                                Fill="Transparent" />
+                        </Canvas>
+                      </Viewbox>
+                    </Button>
+                    <Button Grid.Column="1"
+                            Classes.report-browse-chip="True"
+                            Classes.report-browse-icon="True"
+                            Classes.selected="{Binding IsMonthBrowseScope}"
+                            Command="{Binding SetMonthBrowseScopeCommand}"
+                            ToolTip.Tip="近 31 天">
+                      <Viewbox Width="12" Height="12">
+                        <Canvas Width="16" Height="16">
+                          <Path Data="M3,4.2 L13,4.2 L13,13 L3,13 Z M5.2,2.8 L5.2,5 M10.8,2.8 L10.8,5 M3,6.5 L13,6.5 M5,8.6 L7.2,8.6 M8.8,8.6 L11,8.6 M5,10.6 L7.2,10.6 M8.8,10.6 L11,10.6"
+                                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                StrokeThickness="1.2"
+                                StrokeLineCap="Round"
+                                Fill="Transparent" />
+                        </Canvas>
+                      </Viewbox>
+                    </Button>
+                    <Button Grid.Column="2"
+                            Classes.report-browse-action="True"
+                            Classes.report-browse-icon="True"
+                            Command="{Binding UploadRecentWeekDailyReportsCommand}"
+                            IsEnabled="{Binding !IsBusy}"
+                          ToolTip.Tip="{Binding UploadDailyReportsToolTipText}">
+                      <Viewbox Width="12" Height="12">
+                        <Canvas Width="16" Height="16">
+                          <Path Data="M8,3.2 L8,10.2 M5.6,7.8 L8,10.2 L10.4,7.8 M3.5,12.8 L12.5,12.8 M4.5,12.8 L4.5,10.8 M11.5,12.8 L11.5,10.8"
+                                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                StrokeThickness="1.25"
+                                StrokeLineCap="Round"
+                                Fill="Transparent" />
+                        </Canvas>
+                      </Viewbox>
+                    </Button>
+                    <Grid Grid.Column="3">
+                      <TextBox Classes.report-browse-search="True"
+                               Watermark="搜索项目名 / 正文 / 日期"
+                               Text="{Binding DailyReportBrowseSearchText}" />
+                      <Button Classes.report-browse-search-clear="True"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              Margin="0,0,6,0"
+                              Command="{Binding ClearDailyReportBrowseSearchCommand}"
+                              ToolTip.Tip="清空搜索">
+                        <Viewbox Width="11" Height="11">
+                          <Canvas Width="16" Height="16">
+                            <Path Data="M5,5 L11,11 M11,5 L5,11"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.35"
+                                  StrokeLineCap="Round" />
+                          </Canvas>
+                        </Viewbox>
+                      </Button>
+                    </Grid>
+                    <Button Grid.Column="4"
+                            Classes.report-browse-action="True"
+                            Classes.report-browse-icon="True"
+                            Command="{Binding ToggleAllBrowseReportsExpandedCommand}"
+                            ToolTip.Tip="{Binding BrowseExpandAllButtonText}">
+                      <Viewbox Width="12" Height="12">
+                        <Canvas Width="16" Height="16">
+                          <Path Data="{Binding BrowseExpandAllIconPathData}"
+                                Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                StrokeThickness="1.25"
+                                StrokeLineCap="Round"
+                                Fill="Transparent" />
+                        </Canvas>
+                      </Viewbox>
+                    </Button>
+                  </Grid>
+                  <TextBlock FontSize="11"
+                             Foreground="#64748B"
+                             Text="{Binding DefaultUploadRangePreviewText}"
+                             TextWrapping="Wrap" />
+                  <Border Padding="8,6" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                    <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding BrowseRangeTitle}" />
+                  </Border>
+                  <ItemsControl ItemsSource="{Binding BrowseReports}" IsVisible="{Binding HasBrowseReports}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DailyReportBrowseItemViewModel">
+                        <Border Margin="0,0,0,6" Padding="8" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
+                          <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                              <StackPanel Spacing="1">
+                                <TextBlock FontSize="12" FontWeight="SemiBold" Text="{Binding SummaryText}" TextWrapping="Wrap" />
+                                <TextBlock FontSize="11" Foreground="#6B7280" Text="{Binding PreviewText}" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <Button Grid.Column="1"
+                                      Classes.report-browse-inline="True"
+                                      Classes.report-browse-icon="True"
+                                      Command="{Binding #RootWindow.DataContext.ToggleBrowseReportExpandedCommand}"
+                                      CommandParameter="{Binding .}"
+                                      ToolTip.Tip="{Binding ExpandButtonText}">
+                                <Viewbox Width="12" Height="12">
+                                  <Canvas Width="16" Height="16">
+                                    <Path Data="{Binding ExpandIconPathData}"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.25"
+                                          StrokeLineCap="Round"
+                                          Fill="Transparent" />
+                                  </Canvas>
+                                </Viewbox>
+                              </Button>
+                            </Grid>
+                            <Border IsVisible="{Binding IsExpanded}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                              <StackPanel Spacing="6">
+                                <TextBlock FontSize="12" FontWeight="SemiBold" Text="完整日报" />
+                                <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="88" Text="{Binding FormattedReportText}" />
+                              </StackPanel>
+                            </Border>
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border IsVisible="{Binding !HasBrowseReports}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+                    <TextBlock FontSize="11" Foreground="#64748B" Text="当前范围内还没有日报记录，先保存几天数据后这里会自动展示。" TextWrapping="Wrap" />
+                  </Border>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Grid>
+
+      <Border Grid.Row="1" Padding="8,6" CornerRadius="10" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBlock FontSize="11" Text="{Binding TodoStatusBarText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Border Grid.Column="1"
+                  Width="12"
+                  Height="12"
+                  CornerRadius="6"
+                  Background="#DCFCE7"
+                  BorderBrush="#16A34A"
+                  BorderThickness="1"
+                  VerticalAlignment="Center"
+                  ToolTip.Tip="{Binding DataDirectoryText}">
+            <Border Width="4"
+                    Height="4"
+                    CornerRadius="2"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#16A34A" />
+          </Border>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</Window>

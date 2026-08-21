@@ -1,1 +1,1 @@
-# Lumine.AI_Assistant
+# Lumine.Fairy

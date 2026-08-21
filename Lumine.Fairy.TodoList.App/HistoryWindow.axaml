@@ -1,0 +1,231 @@
+<Window xmlns="https://github.com/avaloniaui"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:avaloniaControls="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.DataGrid"
+		xmlns:vm="using:Lumine.Fairy.TodoList.App.ViewModels"
+		x:Class="Lumine.Fairy.TodoList.App.HistoryWindow"
+		x:DataType="vm:HistoryWindowViewModel"
+		Title="Todo历史记录"
+		Width="1400"
+		Height="800"
+		WindowStartupLocation="CenterOwner"
+		mc:Ignorable="d">
+	<Window.Styles>
+		<Style Selector="TextBox.search">
+			<Setter Property="Padding" Value="9,0,28,0" />
+			<Setter Property="BorderBrush" Value="#D1D5DB" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Background" Value="#FFFFFF" />
+			<Setter Property="Height" Value="30" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="CornerRadius" Value="15" />
+		</Style>
+		<Style Selector="DatePicker.search">
+			<Setter Property="Padding" Value="4,1" />
+			<Setter Property="BorderBrush" Value="#D1D5DB" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Background" Value="#FFFFFF" />
+			<Setter Property="Height" Value="30" />
+			<Setter Property="MinWidth" Value="128" />
+			<Setter Property="CornerRadius" Value="8" />
+		</Style>
+		<Style Selector="Button.icon-action">
+			<Setter Property="Background" Value="#FFFFFF" />
+			<Setter Property="BorderBrush" Value="#CBD5E1" />
+			<Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Foreground" Value="#334155" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Width" Value="30" />
+			<Setter Property="Height" Value="30" />
+			<Setter Property="MinWidth" Value="30" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+			<Setter Property="CornerRadius" Value="6" />
+		</Style>
+		<Style Selector="Button.icon-action TextBlock">
+			<Setter Property="VerticalAlignment" Value="Center" />
+		</Style>
+		<Style Selector="Button.icon-action:pointerover">
+			<Setter Property="Background" Value="#EFF6FF" />
+			<Setter Property="BorderBrush" Value="#93C5FD" />
+		</Style>
+		<Style Selector="Button.search-clear">
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Foreground" Value="#94A3B8" />
+			<Setter Property="Width" Value="22" />
+			<Setter Property="Height" Value="22" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="CornerRadius" Value="11" />
+		</Style>
+		<Style Selector="Button.search-clear:pointerover">
+			<Setter Property="Background" Value="#E2E8F0" />
+			<Setter Property="Foreground" Value="#475569" />
+		</Style>
+		<Style Selector="avaloniaControls|DataGridCell">
+			<Setter Property="Padding" Value="5,3" />
+		</Style>
+		<Style Selector="avaloniaControls|DataGridColumnHeader">
+			<Setter Property="FontWeight" Value="SemiBold" />
+			<Setter Property="Padding" Value="5,3" />
+			<Setter Property="FontSize" Value="12" />
+		</Style>
+	</Window.Styles>
+	<Grid RowDefinitions="Auto,*,Auto" Margin="16">
+		<!-- 搜索栏 -->
+		<Border Grid.Row="0" Padding="7" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8">
+			<Grid RowDefinitions="Auto,Auto" RowSpacing="5">
+				<Grid ColumnDefinitions="*" ColumnSpacing="8">
+					<Grid>
+						<TextBox x:Name="SearchKeywordBox"
+								 Classes.search="True"
+								 Text="{Binding SearchKeyword}"
+								 Watermark="搜索项目名、标题、内容"
+								 GotFocus="SearchInput_OnGotFocus" />
+						<Button Classes.search-clear="True"
+								Command="{Binding ClearSearchCommand}"
+								HorizontalAlignment="Right"
+								VerticalAlignment="Center"
+								Margin="0,0,2,0"
+								IsVisible="{Binding HasSearchKeyword}">
+							<TextBlock Text="✖" FontSize="11" />
+						</Button>
+					</Grid>
+				</Grid>
+
+				<Grid Grid.Row="1"
+					  ColumnDefinitions="Auto,*,Auto,*"
+					  ColumnSpacing="4"
+					  IsVisible="{Binding IsSearchExpanded}">
+					<TextBlock Grid.Column="0" VerticalAlignment="Center" Text="开始日期" Foreground="#475569" Margin="0,0,2,0" FontSize="12" />
+					<DatePicker Grid.Column="1" Classes.search="True" SelectedDate="{Binding StartDate}" GotFocus="SearchInput_OnGotFocus" />
+					<TextBlock Grid.Column="2" VerticalAlignment="Center" Text="结束日期" Foreground="#475569" Margin="3,0,2,0" FontSize="12" />
+					<DatePicker Grid.Column="3" Classes.search="True" SelectedDate="{Binding EndDate}" GotFocus="SearchInput_OnGotFocus" />
+				</Grid>
+			</Grid>
+		</Border>
+
+		<!-- 数据表格 -->
+		<Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8">
+			<Grid RowDefinitions="Auto,*">
+				<Border Grid.Row="0" Background="#F8FAFC" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Padding="7,4">
+					<StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+						<Button Classes.icon-action="True" Command="{Binding AddEntryCommand}" ToolTip.Tip="添加记录">
+							<TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE710;" FontSize="12" />
+						</Button>
+						<Button Classes.icon-action="True" Command="{Binding DeleteSelectedCommand}" IsEnabled="{Binding HasSelection}" ToolTip.Tip="删除所选">
+							<TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74D;" FontSize="12" />
+						</Button>
+						<Button Classes.icon-action="True" Command="{Binding MarkAllCompletedCommand}" IsEnabled="{Binding HasEntries}" ToolTip.Tip="全部完成">
+							<TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE73E;" FontSize="12" />
+						</Button>
+						<Button Classes.icon-action="True" Command="{Binding SaveCommand}" ToolTip.Tip="保存更改">
+							<TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74E;" FontSize="12" />
+						</Button>
+					</StackPanel>
+				</Border>
+
+				<avaloniaControls:DataGrid x:Name="HistoryDataGrid"
+										   Grid.Row="1"
+										   ItemsSource="{Binding FilteredTodoEntries}"
+										   AutoGenerateColumns="False"
+										   GridLinesVisibility="All"
+										   BorderThickness="0"
+										   HeadersVisibility="All"
+										   CanUserResizeColumns="True"
+										   CanUserReorderColumns="False"
+										   CanUserSortColumns="False"
+										   IsReadOnly="False"
+										   FrozenColumnCount="1"
+										   RowHeight="34"
+										   SelectionMode="Extended"
+										   SelectionChanged="HistoryDataGrid_OnSelectionChanged"
+										   HorizontalScrollBarVisibility="Auto"
+										   VerticalScrollBarVisibility="Auto">
+					<avaloniaControls:DataGrid.Columns>
+						<avaloniaControls:DataGridTextColumn Header="工作日期"
+															 Binding="{Binding WorkDateText, Mode=TwoWay}"
+															 Width="120" />
+						<avaloniaControls:DataGridTextColumn Header="项目名"
+															 Binding="{Binding ProjectName, Mode=TwoWay}"
+															 Width="160" />
+						<avaloniaControls:DataGridTextColumn Header="标题"
+															 Binding="{Binding Title, Mode=TwoWay}"
+															 Width="180" />
+						<avaloniaControls:DataGridTemplateColumn Header="内容" Width="2*">
+							<avaloniaControls:DataGridTemplateColumn.CellTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<TextBlock Text="{Binding Content}"
+											   TextWrapping="Wrap"
+											   MaxLines="2"
+											   TextTrimming="CharacterEllipsis"
+											   VerticalAlignment="Center" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellTemplate>
+							<avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<TextBox Text="{Binding Content, Mode=TwoWay}"
+											 AcceptsReturn="True"
+											 TextWrapping="Wrap"
+											 BorderThickness="0"
+											 Background="Transparent" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+						</avaloniaControls:DataGridTemplateColumn>
+						<avaloniaControls:DataGridTemplateColumn Header="状态" Width="120">
+							<avaloniaControls:DataGridTemplateColumn.CellTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<TextBlock Text="{Binding Status}"
+											   VerticalAlignment="Center" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellTemplate>
+							<avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<ComboBox ItemsSource="{Binding TodoStatusOptions}"
+											  SelectedItem="{Binding Status, Mode=TwoWay}"
+											  BorderThickness="0"
+											  Background="Transparent" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+						</avaloniaControls:DataGridTemplateColumn>
+						<avaloniaControls:DataGridTextColumn Header="工时"
+															 Binding="{Binding WorkHoursText, Mode=TwoWay}"
+															 Width="90" />
+						<avaloniaControls:DataGridCheckBoxColumn Header="日报项"
+																 Binding="{Binding IsDaily, Mode=TwoWay}"
+																 Width="90" />
+						<avaloniaControls:DataGridTemplateColumn Header="备注" Width="*">
+							<avaloniaControls:DataGridTemplateColumn.CellTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<TextBlock Text="{Binding Notes}"
+											   TextWrapping="Wrap"
+											   MaxLines="2"
+											   TextTrimming="CharacterEllipsis"
+											   VerticalAlignment="Center" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellTemplate>
+							<avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+								<DataTemplate x:DataType="vm:TodoEntryViewModel">
+									<TextBox Text="{Binding Notes, Mode=TwoWay}"
+											 AcceptsReturn="True"
+											 TextWrapping="Wrap"
+											 BorderThickness="0"
+											 Background="Transparent" />
+								</DataTemplate>
+							</avaloniaControls:DataGridTemplateColumn.CellEditingTemplate>
+						</avaloniaControls:DataGridTemplateColumn>
+					</avaloniaControls:DataGrid.Columns>
+				</avaloniaControls:DataGrid>
+			</Grid>
+		</Border>
+
+		<!-- 底部按钮 -->
+		<Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+			<StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+				<TextBlock Text="{Binding TotalCountText}" Foreground="#475569" FontSize="12" />
+				<TextBlock Text="{Binding SelectedCountText}" Foreground="#475569" FontSize="12" />
+			</StackPanel>
+		</Grid>
+	</Grid>
+</Window>

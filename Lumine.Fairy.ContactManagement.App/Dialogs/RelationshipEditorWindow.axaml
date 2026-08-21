@@ -1,0 +1,110 @@
+<Window xmlns="https://github.com/avaloniaui"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:local="using:Lumine.Fairy.ContactManagement.App.Dialogs"
+		xmlns:vm="using:Lumine.Fairy.ContactManagement.App.ViewModels"
+		xmlns:conv="using:Lumine.Fairy.ContactManagement.App.Converters"
+		x:Class="Lumine.Fairy.ContactManagement.App.Dialogs.RelationshipEditorWindow"
+		x:DataType="local:RelationshipEditorWindow"
+		Width="580"
+		Height="560"
+		MinWidth="580"
+		MinHeight="520"
+		FontSize="13"
+		Title="关系编辑"
+		WindowStartupLocation="CenterOwner"
+		CanResize="False"
+		mc:Ignorable="d">
+	<Window.Resources>
+		<conv:EnumDisplayTextConverter x:Key="EnumDisplayTextConverter" />
+	</Window.Resources>
+	<Grid RowDefinitions="*,Auto" Margin="18">
+		<ScrollViewer>
+			<StackPanel Spacing="10" Margin="0,0,18,0">
+				<TextBlock FontSize="18" FontWeight="SemiBold" Text="关系信息" />
+
+				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+					<TextBlock VerticalAlignment="Center" Text="来源类型" />
+					<ComboBox Grid.Column="1" Width="400" ItemsSource="{Binding EntityKindOptions}" SelectedItem="{Binding Item.SourceEntityKind}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Converter={StaticResource EnumDisplayTextConverter}}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="1" VerticalAlignment="Center" Text="来源实体" />
+					<ComboBox Grid.Row="1" Grid.Column="1" Width="400" ItemsSource="{Binding SourceEntityOptions}"
+							  SelectedValueBinding="{Binding Id}"
+							  SelectedValue="{Binding Item.SourceEntityId}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate x:DataType="vm:LookupOptionViewModel">
+								<TextBlock Text="{Binding DisplayName}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="2" VerticalAlignment="Center" Text="目标类型" />
+					<ComboBox Grid.Row="2" Grid.Column="1" Width="400" ItemsSource="{Binding EntityKindOptions}" SelectedItem="{Binding Item.TargetEntityKind}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Converter={StaticResource EnumDisplayTextConverter}}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="3" VerticalAlignment="Center" Text="目标实体" />
+					<ComboBox Grid.Row="3" Grid.Column="1" Width="400" ItemsSource="{Binding TargetEntityOptions}"
+							  SelectedValueBinding="{Binding Id}"
+							  SelectedValue="{Binding Item.TargetEntityId}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate x:DataType="vm:LookupOptionViewModel">
+								<TextBlock Text="{Binding DisplayName}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="4" VerticalAlignment="Center" Text="关系类型" />
+					<ComboBox Grid.Row="4" Grid.Column="1" Width="400" ItemsSource="{Binding RelationshipLinkTypeOptions}" SelectedItem="{Binding Item.LinkType}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Converter={StaticResource EnumDisplayTextConverter}}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="5" VerticalAlignment="Center" Text="部门名称" />
+					<TextBox Grid.Row="5" Grid.Column="1" Width="400" Watermark="部门名称" HorizontalAlignment="Left" Text="{Binding Item.DepartmentName}" />
+
+					<TextBlock Grid.Row="6" VerticalAlignment="Center" Text="职位 / 角色" />
+					<StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+						<TextBox Width="300" Watermark="职位 / 角色" Text="{Binding Item.Title}" />
+						<CheckBox Content="主关系" IsChecked="{Binding Item.IsPrimary}" VerticalAlignment="Center" />
+					</StackPanel>
+
+					<TextBlock Grid.Row="7" VerticalAlignment="Top" Text="备注" Margin="0,6,0,0" />
+					<TextBox Grid.Row="7"
+							 Grid.Column="1"
+							 Width="400"
+							 Watermark="备注"
+							 AcceptsReturn="True"
+							 TextWrapping="Wrap"
+							 Height="120"
+							 HorizontalAlignment="Left"
+							 VerticalContentAlignment="Top"
+							 Text="{Binding Item.Notes}" />
+				</Grid>
+			</StackPanel>
+		</ScrollViewer>
+
+		<StackPanel Grid.Row="1"
+					Margin="0,12,0,0"
+					Orientation="Horizontal"
+					HorizontalAlignment="Right"
+					Spacing="8">
+			<Button Content="取消" Click="Cancel_Click" MinWidth="82" Height="30" />
+			<Button Content="保存" Click="Save_Click" MinWidth="82" Height="30" />
+		</StackPanel>
+	</Grid>
+</Window>

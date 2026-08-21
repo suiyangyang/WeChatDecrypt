@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Lumine.Fairy.Domain\Lumine.Fairy.Domain.csproj" />
+    <ProjectReference Include="..\Lumine.Fairy.Protocol\Lumine.Fairy.Protocol.csproj" />
+    <ProjectReference Include="..\Lumine.Fairy.Application\Lumine.Fairy.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.10" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

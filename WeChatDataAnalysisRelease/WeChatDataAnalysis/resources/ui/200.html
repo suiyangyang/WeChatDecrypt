@@ -1,0 +1,124 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>微信数据库解密工具</title><script data-hid="first-use-bootstrap">;(function () {
+  'use strict';
+
+  var storageKey = "ui.first_use_agreement";
+  var agreementVersion = "2026-08-12.3";
+  var countdownMilliseconds = 20000;
+  var pathname = String(window.location.pathname || '/');
+  var isAgreementRoute = /^\/agreement\/?$/.test(pathname);
+
+  function readAcceptance() {
+    try {
+      var stored = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+      return !!stored && stored.version === agreementVersion && !!stored.acceptedAt;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function currentRedirect() {
+    return String(window.location.pathname || '/')
+      + String(window.location.search || '')
+      + String(window.location.hash || '');
+  }
+
+  function normalizeRedirect(value) {
+    var target = String(value || '').trim();
+    if (target.indexOf('/') !== 0 || target.indexOf('//') === 0 || target.indexOf('/agreement') === 0) {
+      return '/';
+    }
+    return target;
+  }
+
+  if (!isAgreementRoute) {
+    document.documentElement.removeAttribute('data-first-use-route');
+    if (!readAcceptance()) {
+      var agreementUrl = '/agreement?redirect=' + encodeURIComponent(currentRedirect());
+      window.location.replace(agreementUrl);
+      return;
+    }
+    document.documentElement.setAttribute('data-first-use-accepted', 'true');
+    return;
+  }
+
+  document.documentElement.removeAttribute('data-first-use-accepted');
+  document.documentElement.setAttribute('data-first-use-route', 'agreement');
+  var countdownStartedAt = Date.now();
+
+  function installAgreementFallback() {
+    var page = document.querySelector('.first-use-page');
+    if (!page || page.getAttribute('data-first-use-mounted') === 'true') return;
+
+    var routeGuard = document.querySelector('.first-use-route-guard');
+    if (routeGuard) routeGuard.hidden = true;
+
+    var button = document.querySelector('[data-testid="first-use-confirm"]');
+    if (!button) return;
+
+    var buttonLabel = button.querySelector('span');
+    var statusCopy = document.querySelector('.first-use-footer-status p');
+    var statusDot = document.querySelector('.first-use-status-dot');
+    var intervalId = null;
+
+    function stopFallback() {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function updateFallback() {
+      if (page.getAttribute('data-first-use-mounted') === 'true') {
+        stopFallback();
+        return;
+      }
+
+      var remaining = Math.max(0, countdownMilliseconds - (Date.now() - countdownStartedAt));
+      var remainingSeconds = Math.ceil(remaining / 1000);
+      if (remaining <= 0) {
+        button.disabled = false;
+        if (buttonLabel) buttonLabel.textContent = '我已阅读全部内容并同意';
+        if (statusCopy) statusCopy.textContent = '重点和边界都看完了，确认后开工。';
+        if (statusDot) statusDot.classList.add('ready');
+        stopFallback();
+        return;
+      }
+
+      button.disabled = true;
+      if (buttonLabel) buttonLabel.textContent = '请阅读（' + remainingSeconds + ' 秒）';
+      if (statusCopy) statusCopy.textContent = '请先读完关键内容，' + remainingSeconds + ' 秒后可确认。';
+    }
+
+    button.addEventListener('click', function (event) {
+      if (page.getAttribute('data-first-use-mounted') === 'true') return;
+      if (button.disabled || Date.now() - countdownStartedAt < countdownMilliseconds) {
+        event.preventDefault();
+        return;
+      }
+
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify({
+          version: agreementVersion,
+          acceptedAt: new Date().toISOString()
+        }));
+      } catch (_error) {}
+
+      var redirect = '/';
+      try {
+        redirect = normalizeRedirect(new URL(window.location.href).searchParams.get('redirect'));
+      } catch (_error) {}
+      document.documentElement.removeAttribute('data-first-use-route');
+      document.documentElement.setAttribute('data-first-use-accepted', 'true');
+      window.location.replace(redirect);
+    });
+
+    updateFallback();
+    if (button.disabled) intervalId = window.setInterval(updateFallback, 200);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      window.setTimeout(installAgreementFallback, 1200);
+    }, { once: true });
+  } else {
+    window.setTimeout(installAgreementFallback, 1200);
+  }
+})();</script><link rel="stylesheet" href="/_nuxt/entry.Y9LoqXZP.css" crossorigin><link rel="modulepreload" as="script" crossorigin href="/_nuxt/Dd24uFAM.js"><script type="module" src="/_nuxt/Dd24uFAM.js" crossorigin></script><meta name="description" content="微信4.x版本数据库解密工具"><link rel="icon" type="image/png" href="/logo.png"><script id="unhead:payload" type="application/json">{"title":"微信数据库解密工具"}</script></head><body><div id="__nuxt"></div><div id="teleports"></div><script>window.__NUXT__={};window.__NUXT__.config={public:{apiBase:"/api"},app:{baseURL:"/",buildId:"e62acba8-0137-4087-b30f-99f09f6722e1",buildAssetsDir:"/_nuxt/",cdnURL:""}}</script><script type="application/json" data-nuxt-data="nuxt-app" data-ssr="false" id="__NUXT_DATA__">[{"prerenderedAt":1,"serverRendered":2},1787295492913,false]</script></body></html>

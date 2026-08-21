@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>preview</LangVersion>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets\contact-management.ico</ApplicationIcon>
+    <Win32Icon>Assets\contact-management.ico</Win32Icon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Abstractions\Lumine.Fairy.ContactManagement.Abstractions.csproj" />
+    <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Core\Lumine.Fairy.ContactManagement.Core.csproj" />
+    <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Infrastructure\Lumine.Fairy.ContactManagement.Infrastructure.csproj" />
+    <PackageReference Include="Avalonia" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.7" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.7" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+  </ItemGroup>
+
+</Project>

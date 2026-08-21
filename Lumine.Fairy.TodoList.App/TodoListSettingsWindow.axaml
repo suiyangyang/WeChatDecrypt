@@ -1,0 +1,110 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Lumine.Fairy.TodoList.App.ViewModels"
+        x:Class="Lumine.Fairy.TodoList.App.TodoListSettingsWindow"
+        x:DataType="vm:TodoListSettingsWindowViewModel"
+        Width="560"
+        Height="480"
+        MinWidth="520"
+        MinHeight="440"
+        Title="TodoList 设置"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        mc:Ignorable="d">
+  <Window.Styles>
+    <Style Selector="TextBox.settings-input">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.settings-secondary">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.settings-primary">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#2563EB" />
+      <Setter Property="BorderBrush" Value="#1D4ED8" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+    <StackPanel Spacing="4">
+      <TextBlock Text="上传设置" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="配置 ReportMind 服务地址和登录凭据。上传前会先登录获取 token。" Foreground="#64748B" TextWrapping="Wrap" />
+    </StackPanel>
+
+        <StackPanel Grid.Row="1" Margin="0,16,0,0" Spacing="14">
+      <StackPanel Spacing="6">
+        <TextBlock Text="ReportMind 服务地址" FontWeight="SemiBold" />
+        <TextBox Classes="settings-input"
+                 Watermark="例如：http://localhost:10545"
+                 Text="{Binding ReportMindServerBaseUrl}" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button HorizontalAlignment="Left"
+          Classes="settings-secondary"
+          Content="恢复默认地址"
+          Command="{Binding ResetServerBaseUrlCommand}"
+          IsEnabled="{Binding !IsBusy}" />
+        <Button HorizontalAlignment="Left"
+          Classes="settings-secondary"
+          Content="测试连接"
+          Command="{Binding TestConnectionCommand}"
+          IsEnabled="{Binding !IsBusy}" />
+      </StackPanel>
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="用户名" FontWeight="SemiBold" />
+        <TextBox Classes="settings-input"
+                 Watermark="ReportMind / Lumine 用户名"
+                 Text="{Binding ReportMindUserName}" />
+      </StackPanel>
+
+      <StackPanel Spacing="6">
+        <TextBlock Text="密码" FontWeight="SemiBold" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox Classes="settings-input"
+                   Watermark="ReportMind / Lumine 密码"
+                   PasswordChar="●"
+                   RevealPassword="{Binding IsPasswordVisible}"
+                   Text="{Binding ReportMindPassword}" />
+          <Button Grid.Column="1"
+                  MinWidth="64"
+                  Classes="settings-secondary"
+                  Content="{Binding PasswordVisibilityButtonText}"
+                  Command="{Binding TogglePasswordVisibilityCommand}"
+                  IsEnabled="{Binding !IsBusy}" />
+        </Grid>
+        <TextBlock Text="密码将以明文保存到 TodoList 配置文件。" FontSize="12" Foreground="#64748B" />
+      </StackPanel>
+
+      <Border Padding="10" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+        <StackPanel Spacing="4">
+          <TextBlock Text="设置文件位置" FontWeight="SemiBold" FontSize="12" Foreground="#475569" />
+          <TextBlock Text="{Binding SettingsFilePath}" FontSize="12" Foreground="#64748B" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <Grid Grid.Row="2" Margin="0,16,0,0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}" Foreground="#64748B" TextWrapping="Wrap" />
+      <Button Grid.Column="1" Classes="settings-secondary" Content="取消" Command="{Binding CancelCommand}" IsEnabled="{Binding !IsBusy}" />
+      <Button Grid.Column="2" Classes="settings-primary" Content="保存" Command="{Binding SaveCommand}" IsEnabled="{Binding !IsBusy}" />
+    </Grid>
+  </Grid>
+</Window>

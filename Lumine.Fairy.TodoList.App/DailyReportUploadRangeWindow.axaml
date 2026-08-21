@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Lumine.Fairy.TodoList.App.ViewModels"
+        x:Class="Lumine.Fairy.TodoList.App.DailyReportUploadRangeWindow"
+        x:DataType="vm:DailyReportUploadRangeWindowViewModel"
+        Width="560"
+        Height="260"
+        MinWidth="520"
+        MinHeight="250"
+        Title="选择日报上传时间段"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        mc:Ignorable="d">
+  <Window.Styles>
+    <Style Selector="DatePicker.range-input">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="MinWidth" Value="170" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D1D5DB" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+    <Style Selector="Button.range-secondary">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#CBD5E1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="Button.range-primary">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="#2563EB" />
+      <Setter Property="BorderBrush" Value="#1D4ED8" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+    <StackPanel Spacing="4">
+      <TextBlock Text="选择上传范围" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="连休后可一次选择完整时间段补传日报。" Foreground="#64748B" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="1" Margin="0,16,0,0" Spacing="10">
+      <Grid ColumnDefinitions="Auto,170,Auto,170" ColumnSpacing="8" RowDefinitions="Auto">
+      <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="开始日期" FontWeight="SemiBold" Foreground="#475569" />
+      <DatePicker Grid.Column="1" Classes="range-input" SelectedDate="{Binding StartDate}" />
+      <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="结束日期" FontWeight="SemiBold" Foreground="#475569" />
+      <DatePicker Grid.Column="3" Classes="range-input" SelectedDate="{Binding EndDate}" />
+      </Grid>
+      <Border Padding="10,8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+        <TextBlock Text="{Binding SelectedRangePreviewText}" Foreground="#475569" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+      </Border>
+    </StackPanel>
+
+    <Grid Grid.Row="2" Margin="0,16,0,0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+      <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}" Foreground="#64748B" TextWrapping="Wrap" />
+      <Button Grid.Column="1" Classes="range-secondary" Content="取消" Command="{Binding CancelCommand}" />
+      <Button Grid.Column="2" Classes="range-primary" Content="上传" Command="{Binding ConfirmCommand}" />
+    </Grid>
+  </Grid>
+</Window>

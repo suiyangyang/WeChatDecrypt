@@ -1,0 +1,57 @@
+<Window xmlns="https://github.com/avaloniaui"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:local="using:Lumine.Fairy.ContactManagement.App.Dialogs"
+		x:Class="Lumine.Fairy.ContactManagement.App.Dialogs.CompanyEditorWindow"
+		x:DataType="local:CompanyEditorWindow"
+		Width="560"
+		Height="480"
+		MinWidth="540"
+		MinHeight="460"
+		FontSize="13"
+		Title="公司编辑"
+		WindowStartupLocation="CenterOwner"
+		CanResize="False"
+		mc:Ignorable="d">
+	<Grid RowDefinitions="*,Auto" Margin="18">
+		<ScrollViewer>
+			<StackPanel Spacing="10" Margin="0,0,18,0">
+				<TextBlock FontSize="18" FontWeight="SemiBold" Text="公司信息" />
+				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+					<TextBlock VerticalAlignment="Center" Text="公司名称" />
+					<TextBox Grid.Column="1" Width="400" Watermark="公司名称" Text="{Binding Item.Name}" />
+
+					<TextBlock Grid.Row="1" VerticalAlignment="Center" Text="地址" />
+					<TextBox Grid.Row="1" Grid.Column="1" Width="400" Watermark="地址，使用 ; 分隔" Text="{Binding Item.AddressesText}" />
+
+					<TextBlock Grid.Row="2" VerticalAlignment="Center" Text="部门" />
+					<TextBox Grid.Row="2" Grid.Column="1" Width="400" Watermark="部门，使用 ; 分隔" Text="{Binding Item.DepartmentsText}" />
+
+					<TextBlock Grid.Row="3" VerticalAlignment="Center" Text="状态" />
+					<CheckBox Grid.Row="3" Grid.Column="1" Content="启用" IsChecked="{Binding Item.IsActive}" />
+
+					<TextBlock Grid.Row="4" VerticalAlignment="Top" Text="备注" Margin="0,6,0,0" />
+					<TextBox Grid.Row="4"
+							 Grid.Column="1"
+							 Width="400"
+							 Watermark="备注"
+							 AcceptsReturn="True"
+							 TextWrapping="Wrap"
+							 Height="142"
+							 VerticalContentAlignment="Top"
+							 Text="{Binding Item.Notes}" />
+				</Grid>
+			</StackPanel>
+		</ScrollViewer>
+
+		<StackPanel Grid.Row="1"
+					Margin="0,12,0,0"
+					Orientation="Horizontal"
+					HorizontalAlignment="Right"
+					Spacing="8">
+			<Button Content="取消" Click="Cancel_Click" MinWidth="82" Height="30" />
+			<Button Content="保存" Click="Save_Click" MinWidth="82" Height="30" />
+		</StackPanel>
+	</Grid>
+</Window>

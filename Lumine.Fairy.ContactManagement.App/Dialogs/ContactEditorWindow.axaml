@@ -1,0 +1,148 @@
+<Window xmlns="https://github.com/avaloniaui"
+		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+		xmlns:local="using:Lumine.Fairy.ContactManagement.App.Dialogs"
+		xmlns:vm="using:Lumine.Fairy.ContactManagement.App.ViewModels"
+		xmlns:conv="using:Lumine.Fairy.ContactManagement.App.Converters"
+		xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+		x:Class="Lumine.Fairy.ContactManagement.App.Dialogs.ContactEditorWindow"
+		x:DataType="local:ContactEditorWindow"
+		Width="560"
+		Height="760"
+		MinWidth="540"
+		MinHeight="700"
+		FontSize="13"
+		Title="联系人编辑"
+		WindowStartupLocation="CenterOwner"
+		CanResize="False"
+		mc:Ignorable="d">
+	<Window.Resources>
+		<conv:EnumDisplayTextConverter x:Key="EnumDisplayTextConverter" />
+	</Window.Resources>
+	<Grid RowDefinitions="*,Auto" Margin="18">
+		<ScrollViewer>
+			<StackPanel Spacing="10" Margin="0,0,18,0">
+				<TextBlock FontSize="18" FontWeight="SemiBold" Text="联系人信息" />
+				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
+					<TextBlock VerticalAlignment="Center" Text="姓名" />
+					<TextBox Grid.Column="1" Width="400" Watermark="姓名" Text="{Binding Item.FullName}" />
+
+					<TextBlock Grid.Row="1" VerticalAlignment="Center" Text="昵称" />
+					<TextBox Grid.Row="1" Grid.Column="1" Width="400" Watermark="昵称，使用 ; 分隔" Text="{Binding Item.NicknamesText}" />
+
+					<TextBlock Grid.Row="2" VerticalAlignment="Center" Text="微信 ID" />
+					<TextBox Grid.Row="2" Grid.Column="1" Width="400" Watermark="wxid 或 username，使用 ; 分隔" Text="{Binding Item.WeChatIdsText}" />
+
+					<TextBlock Grid.Row="3" VerticalAlignment="Center" Text="电话" />
+					<TextBox Grid.Row="3" Grid.Column="1" Width="400" Watermark="电话，使用 ; 分隔" Text="{Binding Item.PhonesText}" />
+
+					<TextBlock Grid.Row="4" VerticalAlignment="Center" Text="邮箱" />
+					<TextBox Grid.Row="4" Grid.Column="1" Width="400" Watermark="邮箱，使用 ; 分隔" Text="{Binding Item.EmailsText}" />
+
+					<TextBlock Grid.Row="5" VerticalAlignment="Center" Text="关系类型" />
+					<ComboBox Grid.Row="5" Grid.Column="1" Width="400" ItemsSource="{Binding RelationshipTypeOptions}" SelectedItem="{Binding Item.RelationshipType}">
+						<ComboBox.ItemTemplate>
+							<DataTemplate>
+								<TextBlock Text="{Binding Converter={StaticResource EnumDisplayTextConverter}}" />
+							</DataTemplate>
+						</ComboBox.ItemTemplate>
+					</ComboBox>
+
+					<TextBlock Grid.Row="6" VerticalAlignment="Center" Text="状态" />
+					<CheckBox Grid.Row="6" Grid.Column="1" Content="启用" IsChecked="{Binding Item.IsActive}" />
+
+					<TextBlock Grid.Row="7" VerticalAlignment="Top" Text="所属公司" Margin="0,6,0,0" />
+					<Border Grid.Row="7" Grid.Column="1" Width="400" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="10">
+						<StackPanel Spacing="8">
+							<TextBox Height="30" Watermark="筛选公司" TextChanged="CompanyFilterTextBox_TextChanged" />
+							<ItemsControl ItemsSource="{Binding SelectedCompanyOptions}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<WrapPanel Orientation="Horizontal" />
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="vm:LookupOptionViewModel">
+										<Border Margin="0,0,6,6" Padding="8,4" Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="999">
+											<StackPanel Orientation="Horizontal" Spacing="6">
+												<TextBlock VerticalAlignment="Center" FontSize="11" Foreground="#1D4ED8" Text="{Binding DisplayName}" />
+												<Button Width="18" Height="18" Padding="0" Click="RemoveCompanyTag_Click" Background="Transparent" BorderThickness="0" Foreground="#1D4ED8" Content="×" />
+											</StackPanel>
+										</Border>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<Border Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+								<ScrollViewer Height="110">
+									<ItemsControl ItemsSource="{Binding FilteredCompanyOptions}">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="vm:LookupOptionViewModel">
+												<CheckBox Margin="0,0,0,6" Content="{Binding DisplayName}" IsChecked="{Binding IsSelected}" />
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+							</Border>
+						</StackPanel>
+					</Border>
+
+					<TextBlock Grid.Row="8" VerticalAlignment="Top" Text="参与项目" Margin="0,6,0,0" />
+					<Border Grid.Row="8" Grid.Column="1" Width="400" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="10">
+						<StackPanel Spacing="8">
+							<TextBox Height="30" Watermark="筛选项目" TextChanged="ProjectFilterTextBox_TextChanged" />
+							<ItemsControl ItemsSource="{Binding SelectedProjectOptions}">
+								<ItemsControl.ItemsPanel>
+									<ItemsPanelTemplate>
+										<WrapPanel Orientation="Horizontal" />
+									</ItemsPanelTemplate>
+								</ItemsControl.ItemsPanel>
+								<ItemsControl.ItemTemplate>
+									<DataTemplate x:DataType="vm:LookupOptionViewModel">
+										<Border Margin="0,0,6,6" Padding="8,4" Background="#ECFDF5" BorderBrush="#A7F3D0" BorderThickness="1" CornerRadius="999">
+											<StackPanel Orientation="Horizontal" Spacing="6">
+												<TextBlock VerticalAlignment="Center" FontSize="11" Foreground="#047857" Text="{Binding DisplayName}" />
+												<Button Width="18" Height="18" Padding="0" Click="RemoveProjectTag_Click" Background="Transparent" BorderThickness="0" Foreground="#047857" Content="×" />
+											</StackPanel>
+										</Border>
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+							<Border Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
+								<ScrollViewer Height="110">
+									<ItemsControl ItemsSource="{Binding FilteredProjectOptions}">
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="vm:LookupOptionViewModel">
+												<CheckBox Margin="0,0,0,6" Content="{Binding DisplayName}" IsChecked="{Binding IsSelected}" />
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</ScrollViewer>
+							</Border>
+						</StackPanel>
+					</Border>
+
+					<TextBlock Grid.Row="9" VerticalAlignment="Top" Text="备注" Margin="0,6,0,0" />
+					<TextBox Grid.Row="9"
+							 Grid.Column="1"
+							 Width="400"
+							 Watermark="备注"
+							 AcceptsReturn="True"
+							 TextWrapping="Wrap"
+							 Height="132"
+							 VerticalContentAlignment="Top"
+							 Text="{Binding Item.Notes}" />
+				</Grid>
+			</StackPanel>
+		</ScrollViewer>
+
+		<StackPanel Grid.Row="1"
+					Margin="0,12,0,0"
+					Orientation="Horizontal"
+					HorizontalAlignment="Right"
+					Spacing="8">
+			<Button Content="取消" Click="Cancel_Click" MinWidth="82" Height="30" />
+			<Button Content="保存" Click="Save_Click" MinWidth="82" Height="30" />
+		</StackPanel>
+	</Grid>
+</Window>
