@@ -1,0 +1,297 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:QwenPawRemotePc.Desktop.ViewModels"
+        xmlns:p="using:QwenPawRemotePc.Protocol"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="1180" d:DesignHeight="760"
+        x:Class="QwenPawRemotePc.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="智能助手"
+        Width="1180" Height="760"
+        MinWidth="980" MinHeight="620"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        Background="#F7F9FC">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E4E8EF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+        <Style Selector="Border.notification-card">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E5E9F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="11"/>
+            <Setter Property="Padding" Value="12"/>
+        </Style>
+        <Style Selector="Border.notification-card.read">
+            <Setter Property="Background" Value="#F5F6F8"/>
+            <Setter Property="BorderBrush" Value="#E4E6EA"/>
+            <Setter Property="Opacity" Value="0.72"/>
+        </Style>
+        <Style Selector="TextBlock.page-title">
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#171A1F"/>
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="#737A87"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="Button.nav-item">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#535B68"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="Button.nav-item:pointerover">
+            <Setter Property="Background" Value="#F0F4FA"/>
+        </Style>
+        <Style Selector="Button.nav-item.active">
+            <Setter Property="Background" Value="#E3EEFF"/>
+            <Setter Property="Foreground" Value="#1769D1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.icon-button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#4D5664"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="Button.icon-button:pointerover">
+            <Setter Property="Background" Value="#EEF2F7"/>
+        </Style>
+        <Style Selector="Button.tab-button">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0,0,0,2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#555D69"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="Button.tab-button.active">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1769D1"/>
+            <Setter Property="BorderBrush" Value="#1769D1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.read-icon-button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="15"/>
+        </Style>
+        <Style Selector="Button.read-icon-button:pointerover">
+            <Setter Property="Background" Value="#EAF2FF"/>
+        </Style>
+        <Style Selector="TextBlock.notification-state">
+            <Setter Property="Foreground" Value="#8A919D"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Border.more-menu">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#DCE3EC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="BoxShadow" Value="0 8 24 0 #30000000"/>
+            <Setter Property="Width" Value="220"/>
+        </Style>
+        <Style Selector="Button.more-menu-item">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#142033"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,9"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="Button.more-menu-item:pointerover">
+            <Setter Property="Background" Value="#F1F4F8"/>
+        </Style>
+        <Style Selector="Button.more-menu-item:pressed">
+            <Setter Property="Background" Value="#E6EBF2"/>
+        </Style>
+    </Window.Styles>
+
+    <Window.Resources>
+        <vm:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+        <vm:BooleanToBrushConverter x:Key="NavBackgroundConverter" TrueColor="#E3EEFF" FalseColor="#FFFFFF"/>
+        <vm:BooleanToBrushConverter x:Key="TabBackgroundConverter" TrueColor="#FFFFFF" FalseColor="#FFFFFF"/>
+        <DataTemplate x:Key="NotificationItemTemplate" x:DataType="p:NotificationRecord">
+                        <Border Classes="notification-card" Classes.read="{Binding IsRead}" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                                <Border Width="34" Height="34" CornerRadius="17" Background="#E2ECFF" VerticalAlignment="Top" Margin="0,0,12,0">
+                                    <TextBlock Text="✓" FontSize="17" Foreground="#2875D7" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="3">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#242830" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="已读" Classes="notification-state" IsVisible="{Binding IsRead}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Body}" Foreground="#6D7480" FontSize="13" TextWrapping="Wrap" MaxHeight="38"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
+                                        <TextBlock Text="{Binding Source}" Classes="muted"/>
+                                        <TextBlock Text="{Binding Category}" Classes="muted"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="7">
+                                    <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:HH:mm}}" Foreground="#737A87" FontSize="12" HorizontalAlignment="Right"/>
+                                    <Ellipse Width="8" Height="8" Fill="#1769D1" HorizontalAlignment="Right" IsVisible="{Binding IsRead, Converter={StaticResource InverseBooleanConverter}}"/>
+                                    <Button Classes="read-icon-button" ToolTip.Tip="标记已读" IsEnabled="{Binding IsRead, Converter={StaticResource InverseBooleanConverter}}" Command="{Binding $parent[Window].DataContext.MarkReadCommand}" CommandParameter="{Binding}"><TextBlock Text="✓" FontSize="17" Foreground="#1769D1" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid ColumnDefinitions="178,*">
+        <Border Grid.Column="0" Background="#FBFCFE" BorderBrush="#E5E9F0" BorderThickness="0,0,1,0" Padding="12,16">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="9" Margin="4,0,4,24">
+                    <Border Width="28" Height="28" CornerRadius="7" Background="#1877E8">
+                        <TextBlock Text="●" Foreground="White" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="智能助手" FontSize="17" FontWeight="SemiBold" Foreground="#171A1F" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1">
+                    <Button Background="{Binding IsAllNotificationsNavSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsAllNotificationsNavSelected}" Command="{Binding SelectNotificationTabCommand}" CommandParameter="0">
+                        <Grid ColumnDefinitions="24,*,Auto"><TextBlock Text="▣" FontSize="16"/><TextBlock Grid.Column="1" Text="全部通知"/><Border Grid.Column="2" Classes="count-badge" Background="#1769D1" CornerRadius="9" Padding="6,1"><TextBlock Text="{Binding UnreadCount}" Foreground="White" FontSize="11"/></Border></Grid>
+                    </Button>
+                    <Button Background="{Binding IsUnreadNotificationsNavSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsUnreadNotificationsNavSelected}" Command="{Binding SelectNotificationTabCommand}" CommandParameter="1">
+                        <Grid ColumnDefinitions="24,*,Auto"><TextBlock Text="♧" FontSize="17"/><TextBlock Grid.Column="1" Text="未读"/><Border Grid.Column="2" Background="#EEF0F3" CornerRadius="9" Padding="6,1"><TextBlock Text="{Binding UnreadCount}" Foreground="#68717E" FontSize="11"/></Border></Grid>
+                    </Button>
+                    <Button Background="{Binding IsWorkPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsWorkPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="1">
+                        <Grid ColumnDefinitions="24,*,Auto"><TextBlock Text="▤" FontSize="16"/><TextBlock Grid.Column="1" Text="工作"/><Border Grid.Column="2" Background="#EEF0F3" CornerRadius="9" Padding="6,1"><TextBlock Text="{Binding WorkUnreadCount}" Foreground="#68717E" FontSize="11"/></Border></Grid>
+                    </Button>
+                    <Button Background="{Binding IsWechatPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsWechatPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="2">
+                        <Grid ColumnDefinitions="24,*,Auto"><TextBlock Text="◌" FontSize="18"/><TextBlock Grid.Column="1" Text="微信分析"/><Border Grid.Column="2" Background="#EEF0F3" CornerRadius="9" Padding="6,1"><TextBlock Text="{Binding WechatUnreadCount}" Foreground="#68717E" FontSize="11"/></Border></Grid>
+                    </Button>
+                    <Button Background="{Binding IsRemotePageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsRemotePageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="3">
+                        <Grid ColumnDefinitions="24,*,Auto"><TextBlock Text="▣" FontSize="15"/><TextBlock Grid.Column="1" Text="远程设备"/><Border Grid.Column="2" Background="#EEF0F3" CornerRadius="9" Padding="6,1"><TextBlock Text="{Binding RemoteUnreadCount}" Foreground="#68717E" FontSize="11"/></Border></Grid>
+                    </Button>
+                </StackPanel>
+
+                <Border Grid.Row="2" BorderBrush="#E5E9F0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                    <StackPanel>
+                        <Button Background="{Binding IsSettingsPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsSettingsPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="4"><Grid ColumnDefinitions="24,*"><TextBlock Text="⚙" FontSize="16"/><TextBlock Grid.Column="1" Text="设置"/></Grid></Button>
+                        <Button HorizontalContentAlignment="Stretch" Classes="nav-item" Command="{Binding TestNotificationCommand}"><Grid ColumnDefinitions="24,*"><TextBlock Text="ⓘ" FontSize="16"/><TextBlock Grid.Column="1" Text="关于"/></Grid></Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="28,24,28,24">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="通知中心" Classes="page-title"/>
+                    <TextBlock Text="统一查看本地应用、微信分析和 QwenPaw 任务通知" Classes="muted" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Grid Grid.Column="1">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button Classes="icon-button" Content="⌕" Command="{Binding OpenNotificationSearchCommand}" ToolTip.Tip="搜索通知"/>
+                        <Button Classes="icon-button" Content="≡" Command="{Binding ToggleNotificationMenuCommand}" ToolTip.Tip="通知菜单"/>
+                        <Button x:Name="MoreButton" Classes="icon-button" Content="•••" Command="{Binding ToggleNotificationMenuCommand}" ToolTip.Tip="更多"/>
+                    </StackPanel>
+                    <Popup IsOpen="{Binding IsNotificationMenuOpen, Mode=TwoWay}" PlacementTarget="{Binding #MoreButton}" Placement="BottomEdgeAlignedRight" VerticalOffset="8" IsLightDismissEnabled="True" ZIndex="100">
+                        <Border Classes="more-menu">
+                        <StackPanel Spacing="3">
+                            <Button Classes="more-menu-item" Command="{Binding TestNotificationCommand}">
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="◎" FontSize="18" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="测试通知" VerticalAlignment="Center"/></Grid>
+                            </Button>
+                            <Button Classes="more-menu-item" Command="{Binding MarkAllReadCommand}">
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="✓" FontSize="18" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="全部标记已读" VerticalAlignment="Center"/></Grid>
+                            </Button>
+                            <Border Height="1" Background="#E5E9F0" Margin="4,5"/>
+                            <Button Classes="more-menu-item" Command="{Binding ToggleNotificationMenuCommand}">
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="×" FontSize="20" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="关闭菜单" VerticalAlignment="Center"/></Grid>
+                            </Button>
+                        </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <Grid IsVisible="{Binding IsNotificationPageSelected}">
+                    <Grid RowDefinitions="Auto,*">
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Background="{Binding IsAllNotificationTabSelected, Converter={StaticResource TabBackgroundConverter}}" Classes="tab-button" Classes.active="{Binding IsAllNotificationTabSelected}" Content="全部通知" Command="{Binding SelectNotificationTabCommand}" CommandParameter="0"/>
+                                <Button Background="{Binding IsUnreadNotificationTabSelected, Converter={StaticResource TabBackgroundConverter}}" Classes="tab-button" Classes.active="{Binding IsUnreadNotificationTabSelected}" Content="未读" Command="{Binding SelectNotificationTabCommand}" CommandParameter="1"/>
+                                <Button Background="{Binding IsReadNotificationTabSelected, Converter={StaticResource TabBackgroundConverter}}" Classes="tab-button" Classes.active="{Binding IsReadNotificationTabSelected}" Content="已读" Command="{Binding SelectNotificationTabCommand}" CommandParameter="2"/>
+                            </StackPanel>
+                            <Button Grid.Column="1" Content="全部已读" IsEnabled="{Binding HasUnreadNotifications}" Command="{Binding MarkAllReadCommand}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Grid.Row="1">
+                            <ListBox SelectionChanged="NotificationSelectionChanged" IsVisible="{Binding IsAllNotificationTabSelected}" ItemsSource="{Binding Notifications}" ItemTemplate="{StaticResource NotificationItemTemplate}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.ScrollChanged="NotificationScrollChanged" Background="Transparent" BorderThickness="0"/>
+                            <ListBox SelectionChanged="NotificationSelectionChanged" IsVisible="{Binding IsUnreadNotificationTabSelected}" ItemsSource="{Binding Notifications}" ItemTemplate="{StaticResource NotificationItemTemplate}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.ScrollChanged="NotificationScrollChanged" Background="Transparent" BorderThickness="0"/>
+                            <ListBox SelectionChanged="NotificationSelectionChanged" IsVisible="{Binding IsReadNotificationTabSelected}" ItemsSource="{Binding Notifications}" ItemTemplate="{StaticResource NotificationItemTemplate}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.ScrollChanged="NotificationScrollChanged" Background="Transparent" BorderThickness="0"/>
+                        </Grid>
+                    </Grid>
+                </Grid>
+                <Grid IsVisible="{Binding IsWorkPageSelected}">
+                    <Grid RowDefinitions="Auto,*" Margin="0,0,0,0">
+                        <StackPanel Margin="0,0,0,18"><TextBlock Text="工作" Classes="page-title"/><TextBlock Text="聚合 TODO、待跟进事项和工作类通知" Classes="muted" Margin="0,5,0,0"/></StackPanel>
+                        <ScrollViewer Grid.Row="1"><ItemsControl ItemsSource="{Binding WorkItems}"><ItemsControl.ItemTemplate><DataTemplate><Border Classes="card" Margin="0,0,0,10"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><StackPanel><TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="{Binding Source}" Classes="muted" Margin="0,5,0,0"/></StackPanel><Border Grid.Column="1" Background="#E8F2FF" CornerRadius="12" Padding="12,6"><TextBlock Text="{Binding Priority}" Foreground="#0F6CBD"/></Border><TextBlock Grid.Row="1" Text="{Binding Status}" Foreground="#56657A" Margin="0,12,0,0"/></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+                    </Grid>
+                </Grid>
+                <Grid IsVisible="{Binding IsWechatPageSelected}">
+                    <Grid RowDefinitions="Auto,Auto,Auto,*">
+                        <StackPanel Margin="0,0,0,18"><TextBlock Text="微信分析" Classes="page-title"/><TextBlock Text="选择 QwenPaw Agent，分析最近微信会话并生成工作通知" Classes="muted" Margin="0,5,0,0"/></StackPanel>
+                        <Border Grid.Row="1" Classes="card" Margin="0,0,0,14"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><StackPanel><TextBlock Text="分析 Agent" FontWeight="SemiBold" Foreground="#142033"/><ComboBox ItemsSource="{Binding Agents}" SelectedItem="{Binding SelectedAgent}" Margin="0,8,0,0" MinWidth="460"><ComboBox.ItemTemplate><DataTemplate><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Description}" Classes="muted" TextTrimming="CharacterEllipsis"/></StackPanel></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel><Button Grid.Column="1" Classes="accent" Content="分析最近会话" Command="{Binding AnalyzeWechatCommand}" VerticalAlignment="Bottom"/><TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Provider、Model 和 Memory 由 QwenPaw Agent 管理，本地客户端不单独配置。" Classes="muted" Margin="0,12,0,0"/></Grid></Border>
+                        <Border Grid.Row="2" Classes="card" Margin="0,0,0,14"><StackPanel><TextBlock Text="分析逻辑" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="默认每 5 分钟分析已监控会话的新增内容；发现 TODO、工作意向或疑问后立即生成通知。" TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border>
+                        <Border Grid.Row="3" Classes="card"><StackPanel><TextBlock Text="执行状态" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Foreground="#3E4B60" Margin="0,10,0,0"/></StackPanel></Border>
+                    </Grid>
+                </Grid>
+                <Grid IsVisible="{Binding IsRemotePageSelected}"><Border Classes="card" VerticalAlignment="Top"><StackPanel><TextBlock Text="远程设备" Classes="page-title"/><TextBlock Text="暂未开放" FontSize="18" Foreground="#6B778C" Margin="0,12,0,0"/><TextBlock Text="设备连接、远程控制和设备管理将在后续阶段实现。" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border></Grid>
+                <Grid IsVisible="{Binding IsSettingsPageSelected}">
+                    <ScrollViewer><StackPanel Spacing="14"><TextBlock Text="设置" Classes="page-title"/><Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="QwenPaw 登录" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="服务器地址" Classes="muted"/><TextBox Text="{Binding ServerUrl}"/><TextBlock Text="用户名" Classes="muted"/><TextBox Text="{Binding Username}"/><TextBlock Text="密码" Classes="muted"/><TextBox Text="{Binding Password}" PasswordChar="●"/><Button Classes="accent" Content="登录并读取 Agent" Command="{Binding LoginCommand}" HorizontalAlignment="Left"/><TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border><Border Classes="card"><StackPanel Spacing="8"><TextBlock Text="第三方通知接口" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="接口地址" Classes="muted"/><TextBox Text="{Binding NotificationApiEndpoint}" IsReadOnly="True"/><TextBlock Text="开发 Token" Classes="muted"/><TextBox Text="{Binding NotificationApiToken}" IsReadOnly="True"/><TextBlock Text="仅监听 127.0.0.1，本地第三方程序可使用 Bearer Token 发送通知。" Classes="muted" TextWrapping="Wrap"/></StackPanel></Border></StackPanel></ScrollViewer>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Grid Grid.Column="1" IsVisible="{Binding IsNotificationSearchOpen}" Background="#F7F9FC" Margin="28,24,28,24" ZIndex="20">
+            <Grid RowDefinitions="Auto,Auto,*">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,18">
+                    <Button Classes="icon-button" Content="‹" Command="{Binding CloseNotificationSearchCommand}"/>
+                    <TextBlock Grid.Column="1" Text="搜索通知" Classes="page-title" Margin="12,0,0,0"/>
+                    <Button Grid.Column="2" Content="关闭" Command="{Binding CloseNotificationSearchCommand}"/>
+                </Grid>
+                <TextBox Grid.Row="1" Text="{Binding NotificationSearchKeyword, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索标题、正文、来源、分类或级别" FontSize="16" Padding="14,10" Margin="0,0,0,14"/>
+                <ListBox Grid.Row="2" SelectionChanged="NotificationSelectionChanged" ItemsSource="{Binding Notifications}" ItemTemplate="{StaticResource NotificationItemTemplate}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.ScrollChanged="NotificationScrollChanged" Background="Transparent" BorderThickness="0"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>
