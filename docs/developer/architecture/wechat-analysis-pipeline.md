@@ -17,7 +17,9 @@
 | `WeChatDataAnalysisClient` | 启动或复用微信后端，读取账号、会话和消息 |
 | `WeChatAnalysisCoordinator` | 编排读取、QwenPaw 分析、结果解析、TODO/通知保存 |
 | `QwenPawClient` | 登录 QwenPaw、读取 Agent、发送对话并解析 SSE 响应 |
-| `IncrementalAnalysisScheduler` | 每五分钟检查所有账号和会话的新增消息 |
+| `IncrementalAnalysisScheduler` | 按微信分析设置的解析间隔检查所有账号和会话的新增消息 |
+| `WeChatGroupChatProvider` | 从本地微信会话接口筛选最近有沟通的群聊，不读取聊天正文 |
+| `WeChatGroupChatDirectoryService` | 将群聊按账号和群聊标识同步到联系人管理，并维护公司归属 |
 | `SqliteTodoStore` | 持久化 TODO 候选和 TODO 状态 |
 | `SqliteNotificationStore` | 持久化通知、操作、问题和结构化 payload |
 | Avalonia Desktop | 提供分析按钮、阶段进度、错误、日志和确认操作 |
@@ -47,7 +49,8 @@ WeChatDataAnalysisClient
 - 后端程序来自根目录 `WeChatDataAnalysisRelease`；
 - 端口固定为 `10492`；
 - 优先使用 `WECHAT_TOOL_DATA_DIR`；
-- 未配置时，从当前目录和程序目录向上查找包含 `output/account_keys.json` 或 `output/databases` 的工作区；
+- 未配置时，使用当前运行程序目录作为数据根目录，数据文件位于该目录的 `output` 子目录；
+- 运行目录缺少 `output/account_keys.json` 时，客户端在启动后端前返回明确的数据准备步骤，不继续启动空数据后端；
 - 复用已有后端前检查健康状态、实时账号列表和日志位置；
 - 如果端口被未知后端占用且数据目录不匹配，不自动终止进程，而是返回明确错误；
 - 后端检查使用 `_backendGate` 串行化，所有成功、失败和取消路径都会释放该信号量。
@@ -67,12 +70,26 @@ GET /api/chat/accounts
 ```text
 GET /api/chat/sessions
     ?account={accountId}
-    &limit=20
+    &limit=200
     &preview=latest
     &source=realtime
 ```
 
 会话显示名称依次使用 `displayName`、`display_name`、`name` 和 `username`。
+会话类型优先使用后端的群聊字段；后端未返回类型时，以 `@@` 开头或以 `@chatroom` 结尾的微信会话标识作为群聊兜底判断。
+
+微信群聊同步会额外调用：
+
+```text
+GET /api/chat/contacts
+    ?account={accountId}
+    &include_groups=true
+    &source=realtime
+```
+
+群名优先使用联系人元数据中的 `displayName`、`name`、`nickname`、`remark`，再使用会话名称；如果所有字段仍是微信标识，则显示为“未知群聊”，微信标识保留在“账号 / 标识”列。解析后端返回的 `HH:mm`、`M月d日 HH:mm` 等本地化时间字符串会转换为时间戳后再执行最近沟通筛选。
+
+主 App 的联系人管理页面调用同一会话接口，按账号和 `username` 去重，并按最近沟通时间筛选。群聊目录只保存元数据和人工维护的 `CompanyId` / `ProjectId`，不保存群聊正文。
 
 ### 3.4 消息读取
 
@@ -107,7 +124,7 @@ GET /api/chat/messages
 
 ## 5. 增量分析流程
 
-`IncrementalAnalysisScheduler` 在 QwenPaw 登录成功后启动，默认每五分钟运行一次：
+`IncrementalAnalysisScheduler` 在 QwenPaw 登录成功后启动，默认每 5 分钟运行一次；用户可在“设置 > 微信分析设置”中以分钟配置自动解析间隔，最小为 1 分钟。保存后从下一次轮询开始使用新间隔：
 
 ```text
 读取全部实时账号
@@ -126,6 +143,8 @@ GET /api/chat/messages
                             +-- 有新增：分析新增消息
 ```
 
+在“微信分析”页执行“设置最新分析点”时，调度器按当前白名单范围读取所有账号和会话各自的最新消息，并将 `accountId:conversationId` 对应游标直接推进到该消息。此操作不调用 QwenPaw；选择“未分析过的消息”后从该游标之后读取。自动分析成功后，仍在结果保存成功后将游标推进到本轮最新消息；分析或保存失败时不推进。
+
 游标文件：
 
 ```text
@@ -134,9 +153,9 @@ GET /api/chat/messages
 
 游标键为 `accountId:conversationId`，值由最新消息 ID 和时间戳组成。选择“未分析过的消息”模式时，调度器按游标只提交上次分析之后的消息；首次发现会话时只建立游标，不自动分析全部历史。其他模式按设置的时间范围读取最近 50 条消息。QwenPaw 或本地保存失败时不推进游标，下一轮继续重试。
 
-白名单、分析内容和自动分析模式由微信分析设置页维护。白名单启用后，调度器只处理与选中联系人、公司名称或其别名匹配的联系人和群聊；公司匹配会同时纳入其关联联系人、项目名称和项目群聊。关闭后处理全部会话。提示词只要求 QwenPaw 返回 ToDo 和/或客户提问，客户提问需满足客户 `@我` 且 10 分钟内未得到回复。
+白名单、分析内容、自动分析模式和解析间隔由微信分析设置页维护。解析间隔以分钟保存，默认 5 分钟，范围为 1～1440 分钟；调度器每次等待下一轮时读取当前配置。白名单启用后，调度器只处理与选中联系人、公司名称或其别名匹配的联系人和群聊；公司匹配会同时纳入其关联联系人、项目名称和项目群聊。关闭后处理全部会话。提示词只要求 QwenPaw 返回 ToDo 和/或客户提问，客户提问需满足客户 `@我` 且 10 分钟内未得到回复。
 
-联系人管理中的微信 ID 存储在联系人实体中，并随 SQLite schemaVersion 5 一起迁移；联系人 JSON / Excel 导入导出也保留该字段。自动调度器每次轮询前重新加载联系人数据库，避免联系人管理应用在独立进程中修改数据后出现长期旧缓存。
+联系人管理中的微信 ID 存储在联系人实体中；微信群聊目录随 SQLite schemaVersion 7 一起迁移，JSON / Excel 导入导出也保留群聊归属字段。自动调度器每次轮询前重新加载联系人数据库，联系人管理页面与分析服务在同一主 App 中共享同一数据源；独立宿主修改数据后也会在下一次轮询重新读取。
 
 调度器使用当前选择的 QwenPaw Agent；用户切换 Agent 后，后续轮询同步使用新 Agent。
 
@@ -223,7 +242,7 @@ confirm-todo
 reject-todo
 ```
 
-只有用户确认后才转为 `pending`，进入工作页。TODO 使用账号、会话、消息引用和候选内容生成稳定哈希，避免模型重复使用简单序号导致不同事项被误合并。
+只有用户确认后才转为 `pending`，进入工作页。TODO 使用账号、会话、消息引用和候选内容生成稳定哈希，避免模型重复使用简单序号导致不同事项被误合并。如果当前会话是已在联系人管理中标注公司的微信群聊，`TodoRecord` 同时保存 `CompanyId`、`CompanyName`、会话显示名称和群聊标记，工作页与 TODO 通知展示公司名称。
 
 ### 8.2 通知
 

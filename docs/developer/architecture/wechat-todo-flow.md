@@ -23,21 +23,24 @@ QwenPaw Agent 返回 AnalysisResult JSON
         +--> Question 生成带解决方案的确认通知
 ```
 
+如果消息来自已在联系人管理中标注公司的微信群聊，TODO 候选、通知和工作页会显示公司名称。归属匹配键为 `accountId + conversationId`，不会根据群名或聊天内容自动猜测公司。
+
 ## 消息读取
 
 - 桌面客户端只使用根目录 `WeChatDataAnalysisRelease` 中的发布版后端。
-- 后端固定监听本机 `127.0.0.1:10492`，数据目录由 `WECHAT_TOOL_DATA_DIR` 或工作区自动探测得到。
-- 手动分析读取当前账号第一个符合白名单的会话；增量调度器默认每五分钟检查所有已发现账号和会话。
+- 后端固定监听本机 `127.0.0.1:10492`，数据目录由 `WECHAT_TOOL_DATA_DIR` 指定；未配置时使用当前运行程序目录，`output/account_keys.json` 是账号读取前必须准备的数据文件。
+- 手动分析读取当前账号第一个符合白名单的会话；增量调度器默认每 5 分钟检查所有已发现账号和会话，解析间隔可在微信分析设置中按分钟配置，最小为 1 分钟。
 - 微信分析设置保存在 `%LOCALAPPDATA%/Lumine.Fairy/settings.json`，支持关闭白名单分析全部会话，或按联系人、公司名称及联系人昵称匹配联系人和群聊。
 - 分析内容可选择 ToDo 和客户提问；客户提问要求客户 `@我` 提问且我在 10 分钟内未回复。
 - 自动分析模式支持一个月内、本周、最近 50 条和未分析过的消息，默认使用一个月内；未分析模式使用每个账号/会话的最后分析消息游标。
+- 微信分析页可以执行“设置最新分析点”，按当前分析范围将各账号/会话游标推进到最新消息，跳过已有历史；该操作不调用 QwenPaw。
 - 增量调度器使用当前选择的 QwenPaw Agent，用户切换 Agent 后后续轮询同步更新。
 - 增量游标保存到 `%LOCALAPPDATA%/Lumine.Fairy/analysis-cursors.json`。首次检查只建立游标，不回溯全部历史。
 - QwenPaw 未返回有效 `AnalysisResult` 时分析失败，游标不推进，下一轮继续重试。
 
 ## TODO 生命周期
 
-`Lumine.Fairy.Infrastructure.SqliteTodoStore` 使用 `%LOCALAPPDATA%/Lumine.Fairy/todos.db` 保存 TODO。
+`Lumine.Fairy.Infrastructure.SqliteTodoStore` 使用 `%LOCALAPPDATA%/Lumine.Fairy/todos.db` 保存 TODO，并保存可选的公司 ID、公司名称、会话显示名称和群聊标记。
 
 状态如下：
 
