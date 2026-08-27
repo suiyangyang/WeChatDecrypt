@@ -10,6 +10,12 @@ using Lumine.Fairy.Desktop.Services;
 using Lumine.Fairy.ContactManagement.Infrastructure.Options;
 using Lumine.Fairy.ContactManagement.Infrastructure.Persistence;
 using Lumine.Fairy.ContactManagement.Models;
+using Lumine.Fairy.ContactManagement.App.ImportExport;
+using Lumine.Fairy.ContactManagement.App.ViewModels;
+using Lumine.Fairy.ContactManagement.Core.Services;
+using Lumine.Fairy.ContactManagement.Contracts;
+using Lumine.Fairy.ContactManagement.Abstractions.Services;
+using Lumine.Fairy.ContactManagement.Infrastructure.WeChat;
 
 namespace Lumine.Fairy.Desktop.ViewModels;
 
@@ -25,6 +31,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private readonly IncrementalAnalysisScheduler _scheduler;
     private readonly NotificationHttpServer _notificationApi;
     private readonly AppSettingsStore _settingsStore;
+    private readonly WindowsStartupService _startupService;
     private readonly ContactManagementSqliteStore _contactManagementStore;
     private readonly TimeZoneContext _timeZoneContext;
     private readonly DispatcherTimer _clockTimer;
@@ -39,6 +46,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<AnalysisStageItemViewModel> AnalysisStages { get; } = [];
     public IReadOnlyList<TimeZoneOption> TimeZones { get; }
     public ObservableCollection<WorkItemViewModel> WorkItems { get; } = [];
+    public ContactMainWindowViewModel ContactManagementViewModel { get; }
     public IReadOnlyList<WechatAnalysisContentOptionViewModel> WechatAnalysisContentOptions { get; } =
     [
         new(WeChatAnalysisContentType.Todo, "ToDo"),
@@ -63,6 +71,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private bool _isNotificationApiRunning;
     [ObservableProperty] private QwenPawAgent? _selectedAgent;
     [ObservableProperty] private bool _isWechatWhitelistEnabled;
+    [ObservableProperty] private decimal? _wechatAnalysisIntervalMinutes;
     [ObservableProperty] private WechatAutomaticAnalysisModeOption? _selectedWechatAutomaticAnalysisMode;
     [ObservableProperty] private string _notificationApiEndpoint = "http://127.0.0.1:18765/api/v1/notifications";
     [ObservableProperty] private string _notificationApiToken = "local-dev-notification-token";
@@ -77,6 +86,8 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private int _wechatUnreadCount;
     [ObservableProperty] private int _remoteUnreadCount;
     [ObservableProperty] private TimeZoneOption? _selectedTimeZone;
+    [ObservableProperty] private bool _isStartupEnabled;
+    [ObservableProperty] private string _startupStatusText = string.Empty;
     [ObservableProperty] private string _analysisContextText = "尚未运行微信分析";
     [ObservableProperty] private string _analysisCurrentStageText = "等待开始";
     [ObservableProperty] private string _analysisOverallStatusText = "未开始";
@@ -85,6 +96,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private const int NotificationPageSize = 100;
     private int _notificationOffset;
     private bool _isLoadingNotifications;
+    private bool _suppressStartupSettingChanged;
     private DateTimeOffset? _analysisStartedAt;
     private DateTimeOffset? _analysisEndedAt;
     private Action<NotificationRecord>? _desktopNotificationPresenter;
@@ -92,9 +104,11 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public MainWindowViewModel()
     {
         _settingsStore = new AppSettingsStore();
+        _startupService = new WindowsStartupService();
         _appSettings = _settingsStore.Load();
         _wechatAnalysisSettings = _appSettings.WeChatAnalysis ?? new WeChatAnalysisSettings();
         IsWechatWhitelistEnabled = _wechatAnalysisSettings.EnableWhitelist;
+        WechatAnalysisIntervalMinutes = WeChatAnalysisSettings.NormalizeAnalysisIntervalMinutes(_wechatAnalysisSettings.AnalysisIntervalMinutes);
         SelectedWechatAutomaticAnalysisMode = WechatAutomaticAnalysisModes.FirstOrDefault(x => x.Mode == _wechatAnalysisSettings.AutomaticMode)
             ?? WechatAutomaticAnalysisModes[0];
         foreach (var option in WechatAnalysisContentOptions)
@@ -108,6 +122,12 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         SelectedTimeZone = TimeZones.FirstOrDefault(x => x.Id == _timeZoneContext.Id)
                            ?? TimeZones.FirstOrDefault(x => x.Id == TimeZoneContext.DefaultTimeZoneId)
                            ?? TimeZones.FirstOrDefault();
+        _suppressStartupSettingChanged = true;
+        IsStartupEnabled = _startupService.IsEnabled();
+        _suppressStartupSettingChanged = false;
+        StartupStatusText = IsStartupEnabled
+            ? "开机启动已开启，Fairy 将在下次登录 Windows 时自动运行。"
+            : "开机启动未开启。";
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _clockTimer.Tick += (_, _) =>
         {
@@ -117,7 +137,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         };
         _clockTimer.Start();
 
-        if (int.TryParse(ReadEnvironment("QwenPawInitialPage"), out var initialPage) && initialPage is >= 0 and <= 5)
+        if (int.TryParse(ReadEnvironment("QwenPawInitialPage"), out var initialPage) && initialPage is >= 0 and <= 6)
             SelectedPageIndex = initialPage;
         if (int.TryParse(ReadEnvironment("QwenPawInitialNotificationTab"), out var initialNotificationTab) && initialNotificationTab is >= 0 and <= 2)
             SelectedNotificationTabIndex = initialNotificationTab;
@@ -125,12 +145,29 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         IsNotificationMenuOpen = ReadEnvironment("QwenPawInitialNotificationMenu") == "1";
         _store = new SqliteNotificationStore();
         _todoStore = new SqliteTodoStore();
-        _contactManagementStore = new ContactManagementSqliteStore(new ContactManagementStorageOptions());
+        var contactStorageOptions = new ContactManagementStorageOptions();
+        var contactValidationService = new ContactManagementValidationService();
+        _contactManagementStore = new ContactManagementSqliteStore(contactStorageOptions, contactValidationService);
         _notificationService = new NotificationService(_store);
         _todoService = new TodoService(_todoStore);
         _qwenPaw = new QwenPawClient(new ProtectedTokenStore());
         _wechat = new WeChatDataAnalysisClient();
-        _analysis = new WeChatAnalysisCoordinator(_wechat, _qwenPaw, _notificationService, _todoService);
+        var contactWorkspaceService = new ContactManagementWorkspaceService(_contactManagementStore, contactValidationService);
+        IDataImportService contactImportService = new ContactDomainDataImportService(_contactManagementStore, contactStorageOptions, contactValidationService);
+        IDataExportService contactExportService = new ContactDomainDataExportService(_contactManagementStore, contactStorageOptions);
+        var contactGroupChatDirectoryService = new WeChatGroupChatDirectoryService(
+            _contactManagementStore,
+            new WeChatGroupChatProvider(_wechat));
+        var contactSnapshot = contactWorkspaceService.LoadAsync().GetAwaiter().GetResult();
+        ContactManagementViewModel = new ContactMainWindowViewModel(
+            contactStorageOptions.DatabaseFilePath,
+            contactWorkspaceService,
+            contactImportService,
+            contactExportService,
+            contactStorageOptions.SchemaVersion,
+            contactSnapshot,
+            contactGroupChatDirectoryService);
+        _analysis = new WeChatAnalysisCoordinator(_wechat, _qwenPaw, _notificationService, _todoService, ResolveConversationCompanyAsync);
         _scheduler = new IncrementalAnalysisScheduler(_wechat, _qwenPaw, _analysis, _notificationService);
         _scheduler.WhitelistLoader = RefreshWechatWhitelistCatalogAsync;
         ApplyWechatAnalysisConfiguration(false);
@@ -165,6 +202,29 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         StatusMessage = $"已切换时区：{value.DisplayName}。";
     }
 
+    partial void OnIsStartupEnabledChanged(bool value)
+    {
+        if (_suppressStartupSettingChanged)
+            return;
+
+        try
+        {
+            _startupService.SetEnabled(value);
+            StartupStatusText = value
+                ? "开机启动已开启，Fairy 将在下次登录 Windows 时自动运行。"
+                : "开机启动已关闭。";
+            StatusMessage = StartupStatusText;
+        }
+        catch (Exception ex)
+        {
+            _suppressStartupSettingChanged = true;
+            IsStartupEnabled = !value;
+            _suppressStartupSettingChanged = false;
+            StartupStatusText = $"开机启动设置失败：{ex.Message}";
+            StatusMessage = StartupStatusText;
+        }
+    }
+
     partial void OnSelectedAgentChanged(QwenPawAgent? value)
     {
         if (_scheduler is not null)
@@ -189,9 +249,10 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         0 => "通知中心",
         1 => "工作",
         2 => "微信分析",
-        3 => "App",
-        4 => "远程设备",
-        5 => "设置",
+        3 => "联系人管理",
+        4 => "App",
+        5 => "远程设备",
+        6 => "设置",
         _ => "通知中心",
     };
 
@@ -200,9 +261,10 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         0 => "统一查看本地应用、微信分析和 QwenPaw 任务通知",
         1 => "聚合 TODO、待跟进事项和工作类通知",
         2 => "选择 QwenPaw Agent，分析最近微信会话并生成工作通知",
-        3 => "打开联系人管理和 Todo / 日报应用",
-        4 => "设备连接、远程控制和设备管理",
-        5 => "管理 QwenPaw 连接、本地通知接口和微信分析设置",
+        3 => "维护联系人、公司、项目和微信群聊归属",
+        4 => "打开 Todo / 日报等独立应用",
+        5 => "设备连接、远程控制和设备管理",
+        6 => "管理 QwenPaw 连接、本地通知接口和微信分析设置",
         _ => string.Empty,
     };
 
@@ -211,6 +273,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(IsNotificationPageSelected));
         OnPropertyChanged(nameof(IsWorkPageSelected));
         OnPropertyChanged(nameof(IsWechatPageSelected));
+        OnPropertyChanged(nameof(IsContactManagementPageSelected));
         OnPropertyChanged(nameof(IsAppPageSelected));
         OnPropertyChanged(nameof(IsRemotePageSelected));
         OnPropertyChanged(nameof(IsSettingsPageSelected));
@@ -222,9 +285,10 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public bool IsNotificationPageSelected => SelectedPageIndex == 0;
     public bool IsWorkPageSelected => SelectedPageIndex == 1;
     public bool IsWechatPageSelected => SelectedPageIndex == 2;
-    public bool IsAppPageSelected => SelectedPageIndex == 3;
-    public bool IsRemotePageSelected => SelectedPageIndex == 4;
-    public bool IsSettingsPageSelected => SelectedPageIndex == 5;
+    public bool IsContactManagementPageSelected => SelectedPageIndex == 3;
+    public bool IsAppPageSelected => SelectedPageIndex == 4;
+    public bool IsRemotePageSelected => SelectedPageIndex == 5;
+    public bool IsSettingsPageSelected => SelectedPageIndex == 6;
 
     private async Task InitializeAsync()
     {
@@ -304,6 +368,25 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         return catalog;
     }
 
+    private async Task<ConversationCompanyContext?> ResolveConversationCompanyAsync(
+        ChatAccount account,
+        ChatSession session,
+        CancellationToken cancellationToken)
+    {
+        if (!session.IsGroupConversation) return null;
+
+        var snapshot = await _contactManagementStore.LoadAsync(cancellationToken);
+        var groupChat = snapshot.WeChatGroupChats.FirstOrDefault(item =>
+            item.IsActive
+            && string.Equals(item.AccountId, account.Id, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.WeChatUsername, session.Username, StringComparison.OrdinalIgnoreCase));
+        if (groupChat is null || string.IsNullOrWhiteSpace(groupChat.CompanyId)) return null;
+
+        var company = snapshot.Companies.FirstOrDefault(item =>
+            item.IsActive && string.Equals(item.Id, groupChat.CompanyId, StringComparison.OrdinalIgnoreCase));
+        return company is null ? null : new ConversationCompanyContext(company.Id, company.Name);
+    }
+
     private static IReadOnlyList<WeChatWhitelistEntry> BuildWechatWhitelistCatalog(ContactManagementSnapshot snapshot)
     {
         var activeContacts = snapshot.Contacts
@@ -374,6 +457,13 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return;
         }
 
+        var intervalMinutes = WechatAnalysisIntervalMinutes ?? WeChatAnalysisSettings.DefaultAnalysisIntervalMinutes;
+        if (intervalMinutes != decimal.Truncate(intervalMinutes))
+        {
+            StatusMessage = "解析间隔必须是整数分钟。";
+            return;
+        }
+
         _wechatAnalysisSettings = new WeChatAnalysisSettings
         {
             EnableWhitelist = IsWechatWhitelistEnabled,
@@ -381,7 +471,9 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             WhitelistCompanyIds = WechatWhitelistCompanies.Where(x => x.IsSelected).Select(x => x.Id).ToList(),
             ContentTypes = contentTypes,
             AutomaticMode = SelectedWechatAutomaticAnalysisMode?.Mode ?? WeChatAutomaticAnalysisMode.OneMonth,
+            AnalysisIntervalMinutes = WeChatAnalysisSettings.NormalizeAnalysisIntervalMinutes((int)intervalMinutes),
         };
+        WechatAnalysisIntervalMinutes = _wechatAnalysisSettings.AnalysisIntervalMinutes;
         ApplyWechatAnalysisConfiguration(true);
         StatusMessage = "微信分析设置已保存。";
     }
@@ -470,8 +562,25 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     }
 
     [RelayCommand]
+    private async Task SetLatestAnalysisPointAsync()
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        StatusMessage = "正在读取联系人和群聊的最新消息并设置分析点…";
+        try
+        {
+            var count = await _scheduler.SetLatestAnalysisPointAsync();
+            StatusMessage = count == 0
+                ? "没有找到可设置分析点的联系人或群聊。"
+                : $"已为 {count} 个联系人或群聊设置最新分析点；选择“未分析过的消息”后将从此处继续。";
+        }
+        catch (Exception ex) { StatusMessage = $"设置最新分析点失败：{ex.Message}"; }
+        finally { IsBusy = false; }
+    }
+
+    [RelayCommand]
     private void OpenWechatAnalysisSettings()
-        => SelectedPageIndex = 5;
+        => SelectedPageIndex = 6;
 
     [RelayCommand]
     private async Task MarkReadAsync(NotificationRecord? item)
@@ -514,7 +623,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private void NavigateToPage(string? page)
     {
         if (!int.TryParse(page, out var pageIndex)) return;
-        SelectedPageIndex = Math.Clamp(pageIndex, 0, 5);
+        SelectedPageIndex = Math.Clamp(pageIndex, 0, 6);
         if (SelectedPageIndex == 0)
             SelectedNotificationTabIndex = 0;
         IsNotificationSearchOpen = false;
@@ -523,7 +632,10 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     [RelayCommand]
     private void OpenContactManagementApp()
-        => LaunchBuiltInApp(BuiltInAppLauncher.LaunchContactManagement, "联系人管理已启动。");
+    {
+        SelectedPageIndex = 3;
+        StatusMessage = "已打开联系人管理。";
+    }
 
     [RelayCommand]
     private void OpenTodoListApp()
@@ -760,7 +872,8 @@ public sealed record WorkItemViewModel(
     string Priority,
     string Source,
     string Assignee,
-    string DueAtText)
+    string DueAtText,
+    string CompanyName)
 {
     public static WorkItemViewModel From(TodoRecord todo)
         => new(
@@ -778,7 +891,8 @@ public sealed record WorkItemViewModel(
             todo.Priority,
             todo.Source,
             todo.Assignee ?? string.Empty,
-            todo.DueAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? string.Empty);
+            todo.DueAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? string.Empty,
+            todo.CompanyName ?? string.Empty);
 }
 
 public sealed record TimeZoneOption(string Id, string DisplayName, string OffsetText);

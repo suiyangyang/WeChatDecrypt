@@ -13,7 +13,7 @@
     <Folder Include="Models\" />
     <AvaloniaResource Include="Assets\**" />
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
-    <ProjectReference Include="..\..\Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.App.csproj" ReferenceOutputAssembly="false" Private="false" />
+    <ProjectReference Include="..\..\Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.App.csproj" />
     <ProjectReference Include="..\..\Lumine.Fairy.TodoList.App\Lumine.Fairy.TodoList.App.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
 

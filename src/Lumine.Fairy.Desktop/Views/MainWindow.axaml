@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Lumine.Fairy.Desktop.ViewModels"
+        xmlns:contact="using:Lumine.Fairy.ContactManagement.App"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
@@ -260,17 +261,20 @@
                     <Button Background="{Binding IsWechatPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsWechatPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="2">
                         <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><Path Data="M9.3,4.5 C5.7,4.5 3,6.8 3,9.8 C3,11.5 3.9,13 5.5,14 L4.8,16.5 7.6,15.3 C8.15,15.46 8.7,15.54 9.3,15.54 C12.9,15.54 15.6,13.24 15.6,10.24 C15.6,7.24 12.9,4.5 9.3,4.5 Z M16.25,8.3 C16.85,8.08 17.5,7.96 18.18,7.96 C20.92,7.96 23,9.96 23,12.16 C23,13.41 22.4,14.49 21.45,15.21 L21.9,16.86 20,16.06 C19.55,16.19 19.05,16.26 18.55,16.26 C15.92,16.26 13.9,14.72 13.43,12.61" Width="20" Height="20" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.55" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="微信分析"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="{Binding WechatUnreadCount}" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
                     </Button>
-                    <Button Background="{Binding IsAppPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsAppPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="3">
+                    <Button Background="{Binding IsContactManagementPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsContactManagementPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="3">
+                        <Grid Classes="nav-row" ColumnDefinitions="24,*"><Path Data="M4.5,7.5 C4.5,5.84 5.84,4.5 7.5,4.5 H16.5 C18.16,4.5 19.5,5.84 19.5,7.5 V16.5 C19.5,18.16 18.16,19.5 16.5,19.5 H7.5 C5.84,19.5 4.5,18.16 4.5,16.5 Z M8.2,9.2 H15.8 M8.2,12 H15.8 M8.2,14.8 H12.5" Width="20" Height="20" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="联系人管理"/></Grid>
+                    </Button>
+                    <Button Background="{Binding IsAppPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsAppPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="4">
                         <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><Path Data="M5,5.5H19C20.1,5.5 21,6.4 21,7.5V16.5C21,17.6 20.1,18.5 19,18.5H5C3.9,18.5 3,17.6 3,16.5V7.5C3,6.4 3.9,5.5 5,5.5Z M7,8.5H9 M11,8.5H17 M7,12H9 M11,12H17 M7,15.5H9 M11,15.5H15" Width="20" Height="20" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="App"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="2" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
                     </Button>
-                    <Button Background="{Binding IsRemotePageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsRemotePageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="4">
+                    <Button Background="{Binding IsRemotePageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsRemotePageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="5">
                         <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><TextBlock Text="▣" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="远程设备"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="{Binding RemoteUnreadCount}" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
                     </Button>
                 </StackPanel>
 
                 <Border Grid.Row="2" BorderBrush="#E5E9F0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                     <StackPanel>
-                        <Button Background="{Binding IsSettingsPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsSettingsPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="5"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M19.43,12.98 C19.47,12.66 19.5,12.34 19.5,12 C19.5,11.66 19.47,11.34 19.43,11.02 L21.54,9.37 L19.54,5.91 L17.05,6.91 C16.54,6.53 15.97,6.21 15.35,5.99 L15,3.35 H11 L10.65,5.99 C10.03,6.21 9.46,6.53 8.95,6.91 L6.46,5.91 L4.46,9.37 L6.57,11.02 C6.53,11.34 6.5,11.66 6.5,12 C6.5,12.34 6.53,12.66 6.57,12.98 L4.46,14.63 L6.46,18.09 L8.95,17.09 C9.46,17.47 10.03,17.79 10.65,18.01 L11,20.65 H15 L15.35,18.01 C15.97,17.79 16.54,17.47 17.05,17.09 L19.54,18.09 L21.54,14.63 Z" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/><Ellipse Width="7" Height="7" Margin="2,0,0,0" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid><TextBlock Grid.Column="1" Text="设置"/></Grid></Button>
+                        <Button Background="{Binding IsSettingsPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsSettingsPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="6"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M19.43,12.98 C19.47,12.66 19.5,12.34 19.5,12 C19.5,11.66 19.47,11.34 19.43,11.02 L21.54,9.37 L19.54,5.91 L17.05,6.91 C16.54,6.53 15.97,6.21 15.35,5.99 L15,3.35 H11 L10.65,5.99 C10.03,6.21 9.46,6.53 8.95,6.91 L6.46,5.91 L4.46,9.37 L6.57,11.02 C6.53,11.34 6.5,11.66 6.5,12 C6.5,12.34 6.53,12.66 6.57,12.98 L4.46,14.63 L6.46,18.09 L8.95,17.09 C9.46,17.47 10.03,17.79 10.65,18.01 L11,20.65 H15 L15.35,18.01 C15.97,17.79 16.54,17.47 17.05,17.09 L19.54,18.09 L21.54,14.63 Z" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/><Ellipse Width="7" Height="7" Margin="2,0,0,0" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid><TextBlock Grid.Column="1" Text="设置"/></Grid></Button>
                         <Button HorizontalContentAlignment="Stretch" Classes="nav-item" Command="{Binding TestNotificationCommand}"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Path Data="M12,21 A9,9 0 1 0 12,3 A9,9 0 0 0 12,21 Z M12,10.5 V16 M12,7.5 V7.6" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.55" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="关于"/></Grid></Button>
                     </StackPanel>
                 </Border>
@@ -278,7 +282,7 @@
         </Border>
 
         <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="28,24,28,24">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20" IsVisible="{Binding !IsContactManagementPageSelected}">
                     <StackPanel>
                     <TextBlock Text="{Binding PageTitle}" Classes="page-title"/>
                     <TextBlock Text="{Binding PageSubtitle}" Classes="muted" Margin="0,4,0,0"/>
@@ -327,12 +331,12 @@
                     </Grid>
                 </Grid>
                 <Grid IsVisible="{Binding IsWorkPageSelected}">
-                    <ScrollViewer><ItemsControl ItemsSource="{Binding WorkItems}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:WorkItemViewModel"><Border Classes="card" Margin="0,0,0,10"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"><StackPanel><TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="muted" Margin="0,5,0,0"/><TextBlock Text="{Binding Source}" Classes="muted" Margin="0,5,0,0"/></StackPanel><Border Grid.Column="1" Background="#E8F2FF" CornerRadius="12" Padding="12,6"><TextBlock Text="{Binding Priority}" Foreground="#0F6CBD"/></Border><StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="14" Margin="0,12,0,0"><TextBlock Text="{Binding Status}" Foreground="#56657A"/><TextBlock Text="{Binding Assignee}" Classes="muted" IsVisible="{Binding Assignee, Converter={StaticResource StringToVisibilityConverter}}"/><TextBlock Text="{Binding DueAtText}" Classes="muted" IsVisible="{Binding DueAtText, Converter={StaticResource StringToVisibilityConverter}}"/></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+                    <ScrollViewer><ItemsControl ItemsSource="{Binding WorkItems}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:WorkItemViewModel"><Border Classes="card" Margin="0,0,0,10"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"><StackPanel><TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="muted" Margin="0,5,0,0"/><TextBlock Text="{Binding Source}" Classes="muted" Margin="0,5,0,0"/><TextBlock Text="{Binding CompanyName, StringFormat=公司：{0}}" Classes="muted" IsVisible="{Binding CompanyName, Converter={StaticResource StringToVisibilityConverter}}" Margin="0,5,0,0"/></StackPanel><Border Grid.Column="1" Background="#E8F2FF" CornerRadius="12" Padding="12,6"><TextBlock Text="{Binding Priority}" Foreground="#0F6CBD"/></Border><StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="14" Margin="0,12,0,0"><TextBlock Text="{Binding Status}" Foreground="#56657A"/><TextBlock Text="{Binding Assignee}" Classes="muted" IsVisible="{Binding Assignee, Converter={StaticResource StringToVisibilityConverter}}"/><TextBlock Text="{Binding DueAtText}" Classes="muted" IsVisible="{Binding DueAtText, Converter={StaticResource StringToVisibilityConverter}}"/></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
                     </Grid>
                 <Grid IsVisible="{Binding IsWechatPageSelected}">
                     <Grid RowDefinitions="Auto,Auto,*">
-                        <Border Classes="card" Margin="0,0,0,14"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><StackPanel><TextBlock Text="分析任务" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="Agent、白名单和分析内容可在设置中调整。" Classes="muted" Margin="0,8,0,0"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom"><Button Content="分析设置" Command="{Binding OpenWechatAnalysisSettingsCommand}"/><Button Classes="accent" Content="分析最近会话" Command="{Binding AnalyzeWechatCommand}"/></StackPanel><TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Provider、Model 和 Memory 由 QwenPaw Agent 管理，本地客户端不单独配置。" Classes="muted" Margin="0,12,0,0"/></Grid></Border>
-                        <Border Grid.Row="1" Classes="card" Margin="0,0,0,14"><StackPanel><TextBlock Text="分析逻辑" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="默认每 5 分钟分析已监控会话的新增内容；发现 TODO、工作意向或疑问后立即生成通知。" TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border>
+                        <Border Classes="card" Margin="0,0,0,14"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><StackPanel><TextBlock Text="分析任务" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="Agent、白名单和分析内容可在设置中调整。" Classes="muted" Margin="0,8,0,0"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom"><Button Content="分析设置" Command="{Binding OpenWechatAnalysisSettingsCommand}"/><Button Content="设置最新分析点" Command="{Binding SetLatestAnalysisPointCommand}" ToolTip.Tip="跳过当前历史消息，从当前最新消息之后开始自动分析"/><Button Classes="accent" Content="分析最近会话" Command="{Binding AnalyzeWechatCommand}"/></StackPanel><TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Provider、Model 和 Memory 由 QwenPaw Agent 管理，本地客户端不单独配置。" Classes="muted" Margin="0,12,0,0"/></Grid></Border>
+                        <Border Grid.Row="1" Classes="card" Margin="0,0,0,14"><StackPanel><TextBlock Text="分析逻辑" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="按微信分析设置中的解析间隔轮询已监控会话的新增内容；发现 TODO、工作意向或疑问后立即生成通知。" TextWrapping="Wrap" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border>
                         <Border Grid.Row="2" Classes="card">
                             <StackPanel Spacing="10">
                                 <Grid ColumnDefinitions="*,Auto">
@@ -373,9 +377,12 @@
                         </Border>
                     </Grid>
                 </Grid>
+                <Grid IsVisible="{Binding IsContactManagementPageSelected}">
+                    <contact:MainWindow DataContext="{Binding ContactManagementViewModel}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                </Grid>
                 <Grid IsVisible="{Binding IsAppPageSelected}">
-                    <ScrollViewer>
-                        <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Left">
+                    <ScrollViewer HorizontalContentAlignment="Left" VerticalContentAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Left" VerticalAlignment="Top">
                             <Button Classes="app-tile" Command="{Binding OpenContactManagementAppCommand}">
                                 <StackPanel Spacing="12" HorizontalAlignment="Center">
                                     <Border Width="82" Height="82" CornerRadius="20" Background="#EAF3FF">
@@ -398,6 +405,7 @@
                 <Grid IsVisible="{Binding IsRemotePageSelected}"><Border Classes="card" VerticalAlignment="Top"><StackPanel><TextBlock Text="暂未开放" FontSize="18" Foreground="#6B778C"/><TextBlock Text="设备连接、远程控制和设备管理将在后续阶段实现。" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border></Grid>
                 <Grid IsVisible="{Binding IsSettingsPageSelected}">
                     <ScrollViewer><StackPanel Spacing="14"><Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="QwenPaw 登录" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="服务器地址" Classes="muted"/><TextBox Text="{Binding ServerUrl}"/><TextBlock Text="用户名" Classes="muted"/><TextBox Text="{Binding Username}"/><TextBlock Text="密码" Classes="muted"/><TextBox Text="{Binding Password}" PasswordChar="●"/><Button Classes="accent" Content="登录并读取 Agent" Command="{Binding LoginCommand}" HorizontalAlignment="Left"/><TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
+                        <Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="启动设置" FontSize="18" FontWeight="SemiBold"/><CheckBox Content="开机启动 Fairy" IsChecked="{Binding IsStartupEnabled, Mode=TwoWay}"/><TextBlock Text="{Binding StartupStatusText}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
                         <Border Classes="card">
                             <StackPanel Spacing="12">
                                 <Grid ColumnDefinitions="*,Auto">
@@ -416,19 +424,23 @@
                                 <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
                                     <StackPanel>
                                         <TextBlock Text="联系人" FontWeight="SemiBold" Margin="0,2,0,6"/>
-                                        <ItemsControl ItemsSource="{Binding WechatWhitelistContacts}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:WechatWhitelistOptionViewModel"><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,3"/></DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl ItemsSource="{Binding WechatWhitelistContacts}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:WechatWhitelistOptionViewModel"><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,3"/></DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1">
                                         <TextBlock Text="公司" FontWeight="SemiBold" Margin="0,2,0,6"/>
-                                        <ItemsControl ItemsSource="{Binding WechatWhitelistCompanies}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:WechatWhitelistOptionViewModel"><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,3"/></DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
+                                        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl ItemsSource="{Binding WechatWhitelistCompanies}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:WechatWhitelistOptionViewModel"><CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="0,3"/></DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="分析内容" FontWeight="SemiBold" Margin="0,4,0,0"/>
@@ -443,6 +455,12 @@
                                     <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:WechatAutomaticAnalysisModeOption"><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate>
                                 </ComboBox>
                                 <TextBlock Text="未分析过的消息按每个联系人、群聊分别保存的最后分析消息作为起点，首次启用不会回溯历史。" Classes="muted" TextWrapping="Wrap"/>
+                                <TextBlock Text="解析间隔（min）" FontWeight="SemiBold" Margin="0,4,0,0"/>
+                                <Grid ColumnDefinitions="120,Auto" ColumnSpacing="8">
+                                    <NumericUpDown Value="{Binding WechatAnalysisIntervalMinutes, Mode=TwoWay}" Minimum="1" Maximum="1440" Increment="1" FormatString="0" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Grid.Column="1" Text="min" Classes="muted" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock Text="自动分析按此间隔轮询，默认 5 分钟，最小 1 分钟。保存后从下一次轮询开始生效。" Classes="muted" TextWrapping="Wrap"/>
                                 <Button Classes="accent" Content="保存微信分析设置" Command="{Binding SaveWechatAnalysisSettingsCommand}" HorizontalAlignment="Left"/>
                             </StackPanel>
                         </Border>

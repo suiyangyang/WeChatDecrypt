@@ -4,6 +4,7 @@ using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Avalonia.Controls;
 using Lumine.Fairy.Protocol;
+using Lumine.Fairy.Desktop.Services;
 
 namespace Lumine.Fairy.Desktop;
 
@@ -13,15 +14,24 @@ public sealed class TrayIconService : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly Action _exitAction;
     private readonly Func<Task>? _markAllReadAction;
+    private readonly Action? _openContactManagementAction;
+    private readonly Func<BuiltInAppLaunchResult>? _launchTodoListAction;
     private readonly ToolStripMenuItem _pauseNotificationsItem;
     private bool _notificationsPaused;
     private bool _allowExit;
 
-    public TrayIconService(Window window, Action exitAction, Func<Task>? markAllReadAction = null)
+    internal TrayIconService(
+        Window window,
+        Action exitAction,
+        Func<Task>? markAllReadAction = null,
+        Action? openContactManagementAction = null,
+        Func<BuiltInAppLaunchResult>? launchTodoListAction = null)
     {
         _window = window;
         _exitAction = exitAction;
         _markAllReadAction = markAllReadAction;
+        _openContactManagementAction = openContactManagementAction;
+        _launchTodoListAction = launchTodoListAction;
         _pauseNotificationsItem = CreateItem("暂停通知", MenuIcon.Pause, async (_, _) => await ToggleNotificationsAsync());
         var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "fairy-tray.ico");
         _notifyIcon = new NotifyIcon
@@ -50,6 +60,7 @@ public sealed class TrayIconService : IDisposable
             Renderer = new TrayMenuRenderer(),
         };
         menu.Items.Add(CreateItem("打开通知中心", MenuIcon.Open, (_, _) => ShowWindow()));
+        menu.Items.Add(CreateAppsMenu());
         menu.Items.Add(_pauseNotificationsItem);
         menu.Items.Add(CreateItem("全部标记已读", MenuIcon.MarkRead, async (_, _) => await MarkAllReadAsync()));
         menu.Items.Add(new ToolStripSeparator
@@ -63,6 +74,14 @@ public sealed class TrayIconService : IDisposable
             _exitAction();
         }));
         return menu;
+    }
+
+    private ToolStripMenuItem CreateAppsMenu()
+    {
+        var item = CreateItem("更多App", MenuIcon.Apps, (_, _) => { });
+        item.DropDownItems.Add(CreateItem("联系人管理", MenuIcon.ContactManagement, (_, _) => _openContactManagementAction?.Invoke()));
+        item.DropDownItems.Add(CreateItem("Todo / 日报", MenuIcon.Todo, (_, _) => LaunchBuiltInApp(_launchTodoListAction)));
+        return item;
     }
 
     private static ToolStripMenuItem CreateItem(string text, MenuIcon icon, EventHandler handler)
@@ -123,6 +142,18 @@ public sealed class TrayIconService : IDisposable
             await _markAllReadAction();
     }
 
+    private static void LaunchBuiltInApp(Func<BuiltInAppLaunchResult>? launchAction)
+    {
+        if (launchAction is null)
+            return;
+
+        var result = launchAction();
+        if (!result.Success)
+        {
+            MessageBox.Show(result.FailureReason, "Fairy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
     public void Dispose()
     {
         _notifyIcon.Visible = false;
@@ -132,6 +163,9 @@ public sealed class TrayIconService : IDisposable
     private enum MenuIcon
     {
         Open,
+        Apps,
+        ContactManagement,
+        Todo,
         Pause,
         MarkRead,
         Exit,
@@ -159,6 +193,25 @@ public sealed class TrayIconService : IDisposable
                 graphics.FillEllipse(brush, 6, 8, 2, 2);
                 graphics.FillEllipse(brush, 9, 8, 2, 2);
                 graphics.FillEllipse(brush, 12, 8, 2, 2);
+                break;
+            case MenuIcon.Apps:
+                graphics.DrawRectangle(pen, 3, 3, 6, 6);
+                graphics.DrawRectangle(pen, 11, 3, 6, 6);
+                graphics.DrawRectangle(pen, 3, 11, 6, 6);
+                graphics.DrawRectangle(pen, 11, 11, 6, 6);
+                break;
+            case MenuIcon.ContactManagement:
+                graphics.DrawEllipse(pen, 7, 3, 6, 6);
+                graphics.DrawArc(pen, 4, 10, 12, 10, 180, 180);
+                break;
+            case MenuIcon.Todo:
+                graphics.DrawRectangle(pen, 3, 3, 14, 14);
+                graphics.DrawLine(pen, 6, 8, 8, 10);
+                graphics.DrawLine(pen, 8, 10, 11, 6);
+                graphics.DrawLine(pen, 6, 14, 8, 16);
+                graphics.DrawLine(pen, 8, 16, 11, 12);
+                graphics.DrawLine(pen, 13, 8, 15, 8);
+                graphics.DrawLine(pen, 13, 14, 15, 14);
                 break;
             case MenuIcon.Pause:
                 graphics.DrawEllipse(pen, 3, 3, 14, 14);

@@ -6,6 +6,7 @@ using System.Linq;
 using Avalonia.Markup.Xaml;
 using Lumine.Fairy.Desktop.ViewModels;
 using Lumine.Fairy.Desktop.Views;
+using Lumine.Fairy.Desktop.Services;
 using Avalonia.Controls;
 using Avalonia.Threading;
 
@@ -30,7 +31,18 @@ public partial class App : Avalonia.Application
             {
                 DataContext = _viewModel,
             };
-            _tray = new TrayIconService(window, () => desktop.Shutdown(), () => _viewModel.MarkAllReadCommand.ExecuteAsync(null));
+            _tray = new TrayIconService(
+                window,
+                () => desktop.Shutdown(),
+                () => _viewModel.MarkAllReadCommand.ExecuteAsync(null),
+                () =>
+                {
+                    _viewModel.NavigateToPageCommand.Execute("3");
+                    window.Show();
+                    window.WindowState = WindowState.Normal;
+                    window.Activate();
+                },
+                BuiltInAppLauncher.LaunchTodoList);
             _viewModel.SetDesktopNotificationPresenter(_tray.ShowNotification);
             window.Closing += (_, args) =>
             {
