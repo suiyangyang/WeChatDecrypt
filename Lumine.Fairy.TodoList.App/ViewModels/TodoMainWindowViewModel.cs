@@ -530,7 +530,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task OpenSettingsWindowAsync()
     {
-        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         var settingsWindow = new TodoListSettingsWindow();
         var saved = false;
         settingsWindow.DataContext = new TodoListSettingsWindowViewModel(_todoListSettingsService, wasSaved =>
@@ -671,7 +671,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
 
     private async Task ShowOperationFeedbackDialogAsync(string title, string message, bool isError = false)
     {
-        var owner = (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
         var closeButton = new Button
         {
             Content = "确定",

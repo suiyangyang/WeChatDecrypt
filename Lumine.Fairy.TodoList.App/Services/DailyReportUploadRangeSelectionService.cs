@@ -60,5 +60,5 @@ public sealed class DailyReportUploadRangeSelectionService(Func<Window?>? ownerP
     }
 
     private static Window? ResolveOwnerWindow()
-        => (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        => (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
 }
