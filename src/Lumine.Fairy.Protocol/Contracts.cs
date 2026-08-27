@@ -74,7 +74,36 @@ public sealed record QwenPawLoginResult(string Token, string Username);
 
 public sealed record ChatAccount(string Id, string DisplayName, int DatabaseCount);
 
-public sealed record ChatSession(string Username, string DisplayName, string Preview, long LastMessageTime);
+public sealed record ChatContact(
+    string Username,
+    string DisplayName,
+    string Nickname,
+    string Type,
+    string Name = "",
+    string Remark = "")
+{
+    public bool IsGroup => string.Equals(Type, "group", StringComparison.OrdinalIgnoreCase)
+                           || string.Equals(Type, "chatroom", StringComparison.OrdinalIgnoreCase)
+                           || Username.EndsWith("@chatroom", StringComparison.OrdinalIgnoreCase)
+                           || Username.StartsWith("@@", StringComparison.Ordinal);
+}
+
+public enum ChatConversationKind
+{
+    Unknown,
+    Direct,
+    Group
+}
+
+public sealed record ChatSession(
+    string Username,
+    string DisplayName,
+    string Preview,
+    long LastMessageTime,
+    ChatConversationKind ConversationKind = ChatConversationKind.Unknown)
+{
+    public bool IsGroupConversation => ConversationKind == ChatConversationKind.Group;
+}
 
 public sealed record ChatMessage(string Id, string Sender, string Content, long Timestamp);
 
@@ -94,6 +123,10 @@ public enum WeChatAutomaticAnalysisMode
 
 public sealed class WeChatAnalysisSettings
 {
+    public const int DefaultAnalysisIntervalMinutes = 5;
+    public const int MinimumAnalysisIntervalMinutes = 1;
+    public const int MaximumAnalysisIntervalMinutes = 1440;
+
     public bool EnableWhitelist { get; set; }
     public List<string> WhitelistContactIds { get; set; } = [];
     public List<string> WhitelistCompanyIds { get; set; } = [];
@@ -103,6 +136,10 @@ public sealed class WeChatAnalysisSettings
         WeChatAnalysisContentType.CustomerQuestion,
     ];
     public WeChatAutomaticAnalysisMode AutomaticMode { get; set; } = WeChatAutomaticAnalysisMode.OneMonth;
+    public int AnalysisIntervalMinutes { get; set; } = DefaultAnalysisIntervalMinutes;
+
+    public static int NormalizeAnalysisIntervalMinutes(int value)
+        => Math.Clamp(value, MinimumAnalysisIntervalMinutes, MaximumAnalysisIntervalMinutes);
 }
 
 public sealed record WeChatWhitelistEntry(
@@ -165,7 +202,11 @@ public sealed record TodoRecord(
     DateTimeOffset? ConfirmedAt,
     DateTimeOffset? CompletedAt,
     string Source,
-    string ConversationId);
+    string ConversationId,
+    string? CompanyId = null,
+    string? CompanyName = null,
+    string? ConversationDisplayName = null,
+    bool IsGroupConversation = false);
 
 public sealed record IntentCandidate(
     string Id,

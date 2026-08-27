@@ -45,12 +45,20 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
                 confirmed_at TEXT NULL,
                 completed_at TEXT NULL,
                 source TEXT NOT NULL,
-                conversation_id TEXT NOT NULL
+                conversation_id TEXT NOT NULL,
+                company_id TEXT NULL,
+                company_name TEXT NULL,
+                conversation_display_name TEXT NULL,
+                is_group_conversation INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS ix_todos_status_created_at ON todos(status, created_at DESC);
             CREATE INDEX IF NOT EXISTS ix_todos_conversation ON todos(conversation_id);
             """;
         command.ExecuteNonQuery();
+        EnsureColumn(connection, "todos", "company_id", "TEXT NULL");
+        EnsureColumn(connection, "todos", "company_name", "TEXT NULL");
+        EnsureColumn(connection, "todos", "conversation_display_name", "TEXT NULL");
+        EnsureColumn(connection, "todos", "is_group_conversation", "INTEGER NOT NULL DEFAULT 0");
     }
 
     public async Task<TodoRecord?> GetAsync(string id, CancellationToken cancellationToken = default)
@@ -89,9 +97,11 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
             insert.CommandText = """
                 INSERT INTO todos
                 (id,title,summary,priority,due_at,assignee,confidence,source_refs_json,status,
-                 created_at,confirmed_at,completed_at,source,conversation_id)
+                 created_at,confirmed_at,completed_at,source,conversation_id,company_id,company_name,
+                 conversation_display_name,is_group_conversation)
                 VALUES ($id,$title,$summary,$priority,$due,$assignee,$confidence,$refs,$status,
-                        $created,$confirmed,$completed,$source,$conversation);
+                        $created,$confirmed,$completed,$source,$conversation,$companyId,$companyName,
+                        $conversationDisplayName,$isGroupConversation);
                 """;
             AddParameters(insert, candidate);
             await insert.ExecuteNonQueryAsync(cancellationToken);
@@ -185,6 +195,10 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
         command.Parameters.AddWithValue("$completed", todo.CompletedAt?.ToString("O") ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$source", todo.Source);
         command.Parameters.AddWithValue("$conversation", todo.ConversationId);
+        command.Parameters.AddWithValue("$companyId", todo.CompanyId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$companyName", todo.CompanyName ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$conversationDisplayName", todo.ConversationDisplayName ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$isGroupConversation", todo.IsGroupConversation ? 1 : 0);
     }
 
     private TodoRecord Read(SqliteDataReader reader)
@@ -209,13 +223,35 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
             confirmed,
             completed,
             reader.GetString(reader.GetOrdinal("source")),
-            reader.GetString(reader.GetOrdinal("conversation_id")));
+            reader.GetString(reader.GetOrdinal("conversation_id")),
+            ReadNullableString(reader, "company_id"),
+            ReadNullableString(reader, "company_name"),
+            ReadNullableString(reader, "conversation_display_name"),
+            reader.GetInt64(reader.GetOrdinal("is_group_conversation")) != 0);
     }
+
+    private static string? ReadNullableString(SqliteDataReader reader, string column)
+        => reader.IsDBNull(reader.GetOrdinal(column)) ? null : reader.GetString(reader.GetOrdinal(column));
 
     private static DateTimeOffset? ReadDateTimeOffset(SqliteDataReader reader, string column)
         => reader.IsDBNull(reader.GetOrdinal(column))
             ? null
             : DateTimeOffset.Parse(reader.GetString(reader.GetOrdinal(column)));
+
+    private static void EnsureColumn(SqliteConnection connection, string table, string column, string definition)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = $"PRAGMA table_info({table})";
+        using var reader = check.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        }
+
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        alter.ExecuteNonQuery();
+    }
 
     public void Dispose() => _gate.Dispose();
 }

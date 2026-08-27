@@ -9,11 +9,13 @@ public sealed class WeChatAnalysisCoordinator(
     IWeChatService weChat,
     IQwenPawClient qwenPaw,
     NotificationService notifications,
-    TodoService todos)
+    TodoService todos,
+    Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? companyResolver = null)
 {
     private static readonly TimeSpan WeChatStageTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan QwenPawStageTimeout = TimeSpan.FromMinutes(3);
     private readonly TodoService _todos = todos;
+    private readonly Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? _companyResolver = companyResolver;
 
     public event EventHandler<AnalysisProgressSnapshot>? ProgressChanged;
     public WeChatAnalysisSettings Settings { get; set; } = new();
@@ -113,6 +115,9 @@ public sealed class WeChatAnalysisCoordinator(
         progress.Start("persist", "正在保存 TODO 候选、通知和分析结果");
         try
         {
+            var companyContext = _companyResolver is null
+                ? null
+                : await _companyResolver(account, session, cancellationToken);
 
             if (Allows(WeChatAnalysisContentType.Todo))
             foreach (var todo in analysis.Todos ?? Array.Empty<TodoCandidate>())
@@ -132,7 +137,11 @@ public sealed class WeChatAnalysisCoordinator(
                 null,
                 null,
                 "wechat-analysis",
-                session.Username);
+                session.Username,
+                companyContext?.CompanyId,
+                companyContext?.CompanyName,
+                session.DisplayName,
+                session.IsGroupConversation);
             var stored = await _todos.EnsureCandidateAsync(candidate, cancellationToken);
             if (stored is null || !stored.Status.Equals("pending_confirmation", StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -141,7 +150,9 @@ public sealed class WeChatAnalysisCoordinator(
 
                 await notifications.PublishAsync(new NotificationRequest(
                 $"发现工作内容：{candidate.Title}",
-                candidate.Summary,
+                string.IsNullOrWhiteSpace(candidate.CompanyName)
+                    ? candidate.Summary
+                    : $"公司：{candidate.CompanyName}\n{candidate.Summary}",
                 "wechat-analysis",
                 "work",
                 string.Equals(candidate.Priority, "high", StringComparison.OrdinalIgnoreCase) ? "warning" : "info",

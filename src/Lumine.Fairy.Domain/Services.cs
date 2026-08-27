@@ -35,8 +35,23 @@ public interface IWeChatService
 {
     Task<IReadOnlyList<ChatAccount>> GetAccountsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ChatSession>> GetSessionsAsync(string accountId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ChatContact>> GetChatContactsAsync(string accountId, bool includeGroups = true, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ChatMessage>> GetLatestMessagesAsync(string accountId, string conversationId, int limit, CancellationToken cancellationToken = default);
 }
+
+public interface IWeChatGroupChatProvider
+{
+    Task<IReadOnlyList<WeChatGroupChatCandidate>> GetRecentAsync(TimeSpan lookback, CancellationToken cancellationToken = default);
+}
+
+public sealed record WeChatGroupChatCandidate(
+    string AccountId,
+    string AccountDisplayName,
+    string WeChatUsername,
+    string DisplayName,
+    DateTimeOffset? LastMessageAt);
+
+public sealed record ConversationCompanyContext(string? CompanyId, string? CompanyName);
 
 public interface IProtectedTokenStore
 {

@@ -5,7 +5,7 @@ using Lumine.Fairy.Protocol;
 namespace Lumine.Fairy.Application;
 
 /// <summary>
-/// Runs the phase-one five-minute polling loop and persists one cursor per account/conversation.
+/// Runs the configurable polling loop and persists one cursor per account/conversation.
 /// </summary>
 public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
 {
@@ -14,6 +14,8 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
     private readonly WeChatAnalysisCoordinator _coordinator;
     private readonly NotificationService _notifications;
     private readonly Dictionary<string, string> _cursors;
+    private readonly object _cursorGate = new();
+    private readonly SemaphoreSlim _cursorOperationGate = new(1, 1);
     private readonly string _cursorPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumine.Fairy", "analysis-cursors.json");
     private CancellationTokenSource? _cts;
     private Task? _worker;
@@ -28,25 +30,80 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
     }
 
     public bool IsRunning => _worker is { IsCompleted: false };
-    public TimeSpan Interval { get; private set; } = TimeSpan.FromMinutes(5);
+    private WeChatAnalysisSettings _settings = new();
+    private bool _usesConfiguredInterval = true;
+
+    public TimeSpan Interval { get; private set; } = TimeSpan.FromMinutes(WeChatAnalysisSettings.DefaultAnalysisIntervalMinutes);
     public string AgentId { get; set; } = "default";
-    public WeChatAnalysisSettings Settings { get; set; } = new();
+    public WeChatAnalysisSettings Settings
+    {
+        get => _settings;
+        set
+        {
+            _settings = value ?? new WeChatAnalysisSettings();
+            if (_usesConfiguredInterval)
+                Interval = GetConfiguredInterval(_settings);
+        }
+    }
     public IReadOnlyList<WeChatWhitelistEntry> Whitelist { get; set; } = [];
     public Func<CancellationToken, Task<IReadOnlyList<WeChatWhitelistEntry>>>? WhitelistLoader { get; set; }
 
     public void Start(TimeSpan? interval = null)
     {
         if (IsRunning) return;
-        Interval = interval ?? TimeSpan.FromMinutes(5);
+        _usesConfiguredInterval = interval is null;
+        Interval = interval ?? GetConfiguredInterval(Settings);
         _cts = new CancellationTokenSource();
         _worker = Task.Run(() => RunAsync(_cts.Token), _cts.Token);
     }
 
+    public async Task<int> SetLatestAnalysisPointAsync(CancellationToken cancellationToken = default)
+    {
+        await _cursorOperationGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (WhitelistLoader is not null)
+                Whitelist = await WhitelistLoader(cancellationToken);
+
+            var cursorUpdates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var accounts = await _weChat.GetAccountsAsync(cancellationToken);
+            foreach (var account in accounts)
+            {
+                var sessions = await _weChat.GetSessionsAsync(account.Id, cancellationToken);
+                foreach (var session in sessions)
+                {
+                    if (!WeChatAnalysisSelection.IsSessionAllowed(session, Settings, Whitelist)) continue;
+
+                    var messages = await _weChat.GetLatestMessagesAsync(account.Id, session.Username, 1, cancellationToken);
+                    var latest = messages.LastOrDefault();
+                    if (latest is null) continue;
+
+                    cursorUpdates[$"{account.Id}:{session.Username}"] = WeChatAnalysisSelection.GetCursor(latest);
+                }
+            }
+
+            if (cursorUpdates.Count == 0) return 0;
+
+            lock (_cursorGate)
+            {
+                foreach (var update in cursorUpdates)
+                    _cursors[update.Key] = update.Value;
+                SaveCursorsLocked();
+            }
+
+            return cursorUpdates.Count;
+        }
+        finally
+        {
+            _cursorOperationGate.Release();
+        }
+    }
+
     private async Task RunAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(Interval);
-        while (await timer.WaitForNextTickAsync(cancellationToken))
+        while (true)
         {
+            await Task.Delay(Interval, cancellationToken);
             try
             {
                 if (!_qwenPaw.IsAuthenticated) continue;
@@ -91,7 +148,23 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         }
     }
 
+    private static TimeSpan GetConfiguredInterval(WeChatAnalysisSettings settings)
+        => TimeSpan.FromMinutes(WeChatAnalysisSettings.NormalizeAnalysisIntervalMinutes(settings.AnalysisIntervalMinutes));
+
     private async Task ProcessSessionAsync(ChatAccount account, ChatSession session, CancellationToken cancellationToken)
+    {
+        await _cursorOperationGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ProcessSessionCoreAsync(account, session, cancellationToken);
+        }
+        finally
+        {
+            _cursorOperationGate.Release();
+        }
+    }
+
+    private async Task ProcessSessionCoreAsync(ChatAccount account, ChatSession session, CancellationToken cancellationToken)
     {
         if (!WeChatAnalysisSelection.IsSessionAllowed(session, Settings, Whitelist)) return;
 
@@ -101,24 +174,31 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
 
         var cursorKey = $"{account.Id}:{session.Username}";
         var cursor = WeChatAnalysisSelection.GetCursor(latest);
-        _cursors.TryGetValue(cursorKey, out var previous);
+        string? previous;
+        lock (_cursorGate)
+            _cursors.TryGetValue(cursorKey, out previous);
         var newMessages = WeChatAnalysisSelection.SelectMessages(messages, Settings.AutomaticMode, previous);
         if (newMessages.Count == 0)
         {
             if (Settings.AutomaticMode == WeChatAutomaticAnalysisMode.Unanalyzed && previous is null)
-            {
-                _cursors[cursorKey] = cursor;
-                SaveCursors();
-            }
+                SaveCursor(cursorKey, cursor);
             return;
         }
 
         await _coordinator.AnalyzeMessagesAsync(account, session, newMessages, AgentId, cancellationToken);
-        _cursors[cursorKey] = cursor;
-        SaveCursors();
+        SaveCursor(cursorKey, cursor);
     }
 
-    private void SaveCursors()
+    private void SaveCursor(string cursorKey, string cursor)
+    {
+        lock (_cursorGate)
+        {
+            _cursors[cursorKey] = cursor;
+            SaveCursorsLocked();
+        }
+    }
+
+    private void SaveCursorsLocked()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(_cursorPath)!);
         File.WriteAllText(_cursorPath, JsonSerializer.Serialize(_cursors));
