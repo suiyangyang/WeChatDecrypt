@@ -1,16 +1,18 @@
 # Lumine.Fairy.ContactManagement.App
 
-这是联系人/公司/项目/关系管理子应用的当前 MVP。
+这是联系人/公司/项目/关系管理页面及其独立宿主。主 Fairy App 会直接嵌入该页面，独立可执行文件作为兼容入口保留。
 
 `Todo / 客户问题 / 日报 / 随手记` 工作区已拆分为独立的 `Lumine.Fairy.TodoList.App`。
 
 ## 当前能力
 
 - 基于独立 `SQLite` 数据库文件存储全部联系人域数据
-- 支持联系人、公司、项目、关系四类实体的基础 CRUD
-- 导航改为左侧菜单，默认进入“主页”查看当前数据汇总
+- 支持联系人、公司、项目、关系和微信群聊目录的管理
+- 从本机微信解析结果同步最近有沟通的群聊，并为群聊标注所属公司
+- 页面内部使用左侧 Tab 菜单，默认进入“主页”查看当前数据汇总
 - 联系人、公司、项目、关系页统一为“顶部工具栏 + 下方表格”布局
 - 新建/编辑联系人、公司、项目、关系统一使用弹窗
+- 联系人关系类型支持：自己、陌生人、同事、熟人、家人、客户、合作伙伴和其他
 - 删除联系人/公司/项目时自动清理相关关系引用
 - 默认在“主页”菜单展示实时统计汇总
 - 支持 JSON / Excel 导入预检、提交导入、导出与示例模板生成
@@ -41,12 +43,12 @@ dotnet build "Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.
 - 预检通过后可提交到当前 SQLite 数据库
 - 可导出当前数据快照，也可生成一个可编辑的示例导入模板（支持 `json` / `xlsx`）
 - 预检结果会按“错误 / 警告 / 提示”分组展示，便于人工确认后再提交
-- 当前联系人应用只接受联系人域数据：`联系人 / 公司 / 项目 / 关系`
+- 当前联系人应用只接受联系人域数据：`联系人 / 公司 / 项目 / 群聊归属 / 关系`
 - 如果导入文件包含 `Todo / 客户问题 / 日报 / 随手记` 相关字段或工作表，预检会直接提示不受支持
 
 ## Excel 工作表字段
 
-当前 `xlsx` 导入导出仅支持以下 `4` 张工作表：
+当前 `xlsx` 导入导出支持以下 `5` 张工作表：
 
 ### 1. `Contacts`
 
@@ -80,7 +82,19 @@ dotnet build "Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.
 - `Notes`：备注
 - `IsActive`：是否启用，布尔值
 
-### 4. `RelationshipLinks`
+### 4. `WeChatGroupChats`
+
+- `Id`：群聊目录主键
+- `AccountId` / `AccountDisplayName`：微信账号标识和显示名称
+- `WeChatUsername`：群聊唯一标识，必填
+- `DisplayName`：群聊名称，必填
+- `LastMessageAt`：最近沟通时间，ISO 8601，可为空
+- `CompanyId`：所属公司 ID，可为空
+- `ProjectId`：所属项目 ID，可为空
+- `IsActive`：是否启用，布尔值
+- `LastSyncedAt`：最后同步时间，ISO 8601
+
+### 5. `RelationshipLinks`
 
 - `Id`：关系主键，留空时导入会自动生成
 - `SourceKind` / `TargetKind`：实体类型枚举，支持 `Contact`、`Company`、`Project`

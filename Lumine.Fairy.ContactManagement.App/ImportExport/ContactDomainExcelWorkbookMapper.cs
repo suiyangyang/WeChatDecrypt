@@ -8,6 +8,7 @@ internal static class ContactDomainExcelWorkbookMapper
     private const string ContactsSheetName = "Contacts";
     private const string CompaniesSheetName = "Companies";
     private const string ProjectsSheetName = "Projects";
+    private const string WeChatGroupChatsSheetName = "WeChatGroupChats";
     private const string RelationshipLinksSheetName = "RelationshipLinks";
 
     private static readonly string[] UnsupportedSheetNames = ["TodoEntries", "ClientIssues", "DailyReports", "ScratchNoteDocuments"];
@@ -23,9 +24,10 @@ internal static class ContactDomainExcelWorkbookMapper
         var contactsSheet = GetRequiredSheet(workbook, ContactsSheetName, conflicts);
         var companiesSheet = GetRequiredSheet(workbook, CompaniesSheetName, conflicts);
         var projectsSheet = GetRequiredSheet(workbook, ProjectsSheetName, conflicts);
+        var groupChatsSheet = GetRequiredSheet(workbook, WeChatGroupChatsSheetName, conflicts);
         var relationshipsSheet = GetRequiredSheet(workbook, RelationshipLinksSheetName, conflicts);
 
-        if (contactsSheet is null || companiesSheet is null || projectsSheet is null || relationshipsSheet is null)
+        if (contactsSheet is null || companiesSheet is null || projectsSheet is null || groupChatsSheet is null || relationshipsSheet is null)
         {
             return new ContactManagementSnapshot();
         }
@@ -35,6 +37,7 @@ internal static class ContactDomainExcelWorkbookMapper
             Contacts = ReadContacts(contactsSheet, conflicts),
             Companies = ReadCompanies(companiesSheet, conflicts),
             Projects = ReadProjects(projectsSheet, conflicts),
+            WeChatGroupChats = ReadWeChatGroupChats(groupChatsSheet, conflicts),
             RelationshipLinks = ReadRelationshipLinks(relationshipsSheet, conflicts)
         };
     }
@@ -54,6 +57,7 @@ internal static class ContactDomainExcelWorkbookMapper
         WriteContacts(workbook, snapshot.Contacts);
         WriteCompanies(workbook, snapshot.Companies);
         WriteProjects(workbook, snapshot.Projects);
+        WriteWeChatGroupChats(workbook, snapshot.WeChatGroupChats);
         WriteRelationshipLinks(workbook, snapshot.RelationshipLinks);
         workbook.SaveAs(filePath);
     }
@@ -210,6 +214,31 @@ internal static class ContactDomainExcelWorkbookMapper
             });
         }
 
+        return items;
+    }
+
+    private static List<WeChatGroupChatProfile> ReadWeChatGroupChats(IXLWorksheet worksheet, List<ImportConflictItem> conflicts)
+    {
+        var headers = ReadHeaders(worksheet, ["WeChatUsername", "DisplayName"], WeChatGroupChatsSheetName, conflicts);
+        List<WeChatGroupChatProfile> items = [];
+        foreach (var row in ReadDataRows(worksheet))
+        {
+            var username = GetString(row, headers, "WeChatUsername");
+            if (string.IsNullOrWhiteSpace(username)) continue;
+            items.Add(new WeChatGroupChatProfile
+            {
+                Id = GetString(row, headers, "Id", fallback: Guid.NewGuid().ToString("N")),
+                AccountId = GetString(row, headers, "AccountId"),
+                AccountDisplayName = GetString(row, headers, "AccountDisplayName"),
+                WeChatUsername = username,
+                DisplayName = GetString(row, headers, "DisplayName", fallback: username),
+                LastMessageAt = DateTimeOffset.TryParse(GetString(row, headers, "LastMessageAt"), out var lastMessageAt) ? lastMessageAt : null,
+                CompanyId = GetNullableString(row, headers, "CompanyId"),
+                ProjectId = GetNullableString(row, headers, "ProjectId"),
+                IsActive = GetBoolean(row, headers, "IsActive", true),
+                LastSyncedAt = DateTimeOffset.TryParse(GetString(row, headers, "LastSyncedAt"), out var syncedAt) ? syncedAt : DateTimeOffset.UtcNow
+            });
+        }
         return items;
     }
 
@@ -379,6 +408,29 @@ internal static class ContactDomainExcelWorkbookMapper
             row++;
         }
 
+        worksheet.Columns().AdjustToContents();
+    }
+
+    private static void WriteWeChatGroupChats(XLWorkbook workbook, IReadOnlyList<WeChatGroupChatProfile> items)
+    {
+        var worksheet = workbook.Worksheets.Add(WeChatGroupChatsSheetName);
+        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
+        WriteHeaders(worksheet, headers);
+        var row = 2;
+        foreach (var item in items)
+        {
+            worksheet.Cell(row, 1).Value = item.Id;
+            worksheet.Cell(row, 2).Value = item.AccountId;
+            worksheet.Cell(row, 3).Value = item.AccountDisplayName;
+            worksheet.Cell(row, 4).Value = item.WeChatUsername;
+            worksheet.Cell(row, 5).Value = item.DisplayName;
+            worksheet.Cell(row, 6).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
+            worksheet.Cell(row, 7).Value = item.CompanyId ?? string.Empty;
+            worksheet.Cell(row, 8).Value = item.ProjectId ?? string.Empty;
+            worksheet.Cell(row, 9).Value = item.IsActive;
+            worksheet.Cell(row, 10).Value = item.LastSyncedAt.ToString("O");
+            row++;
+        }
         worksheet.Columns().AdjustToContents();
     }
 

@@ -2,6 +2,7 @@ using Lumine.Fairy.ContactManagement.Core.Services;
 using Lumine.Fairy.ContactManagement.Infrastructure.Options;
 using Lumine.Fairy.ContactManagement.Infrastructure.Persistence;
 using Lumine.Fairy.ContactManagement.Models;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Lumine.Fairy.ContactManagement.Tests;
@@ -194,5 +195,49 @@ public sealed class ContactManagementSqliteStoreTests
         Assert.Equal("第二版联系人", contact.FullName);
         Assert.Equal("company-2", company.Id);
         Assert.Equal("第二版公司", company.Name);
+    }
+
+    [Fact]
+    public async Task Constructor_WhenSchemaSixAlreadyContainsAccountDisplayName_CompletesUpgrade()
+    {
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "Lumine.Fairy.ContactManagement.Tests", Guid.NewGuid().ToString("N"));
+        var options = new ContactManagementStorageOptions
+        {
+            BaseDirectoryPath = tempDirectory
+        };
+
+        Directory.CreateDirectory(tempDirectory);
+        await using (var connection = new SqliteConnection($"Data Source={options.DatabaseFilePath};"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                INSERT INTO app_meta(key, value) VALUES ('schema_version', '6');
+                CREATE TABLE wechat_group_chats (
+                    id TEXT PRIMARY KEY,
+                    account_id TEXT NOT NULL,
+                    account_display_name TEXT NOT NULL DEFAULT '',
+                    wechat_username TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    last_message_at TEXT NULL,
+                    company_id TEXT NULL,
+                    project_id TEXT NULL,
+                    is_active INTEGER NOT NULL DEFAULT 1,
+                    last_synced_at TEXT NOT NULL
+                );
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var store = new ContactManagementSqliteStore(options, new ContactManagementValidationService());
+        var snapshot = await store.LoadAsync();
+
+        Assert.Empty(snapshot.WeChatGroupChats);
+        await using var verifyConnection = new SqliteConnection($"Data Source={options.DatabaseFilePath};");
+        await verifyConnection.OpenAsync();
+        await using var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = "SELECT value FROM app_meta WHERE key='schema_version';";
+        Assert.Equal("7", (string?)await verifyCommand.ExecuteScalarAsync());
     }
 }

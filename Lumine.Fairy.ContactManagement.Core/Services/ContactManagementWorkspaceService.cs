@@ -51,6 +51,7 @@ public sealed class ContactManagementWorkspaceService
             Contacts = contacts,
             Companies = snapshot.Companies,
             Projects = snapshot.Projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = RebuildContactAffiliationLinks(snapshot.RelationshipLinks, contact),
             TodoEntries = snapshot.TodoEntries,
             ClientIssues = snapshot.ClientIssues,
@@ -89,6 +90,7 @@ public sealed class ContactManagementWorkspaceService
                     }
                     : project)
                 .ToList(),
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = snapshot.RelationshipLinks
                 .Where(x => !(x.SourceEntityKind == EntityKind.Contact && string.Equals(x.SourceEntityId, normalizedId, StringComparison.OrdinalIgnoreCase))
                          && !(x.TargetEntityKind == EntityKind.Contact && string.Equals(x.TargetEntityId, normalizedId, StringComparison.OrdinalIgnoreCase)))
@@ -121,6 +123,7 @@ public sealed class ContactManagementWorkspaceService
             Contacts = snapshot.Contacts,
             Companies = companies,
             Projects = snapshot.Projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = snapshot.RelationshipLinks,
             TodoEntries = snapshot.TodoEntries,
             ClientIssues = snapshot.ClientIssues,
@@ -174,6 +177,23 @@ public sealed class ContactManagementWorkspaceService
                     }
                     : project)
                 .ToList(),
+            WeChatGroupChats = snapshot.WeChatGroupChats
+                .Select(groupChat => string.Equals(groupChat.CompanyId, normalizedId, StringComparison.OrdinalIgnoreCase)
+                    ? new WeChatGroupChatProfile
+                    {
+                        Id = groupChat.Id,
+                        AccountId = groupChat.AccountId,
+                        AccountDisplayName = groupChat.AccountDisplayName,
+                        WeChatUsername = groupChat.WeChatUsername,
+                        DisplayName = groupChat.DisplayName,
+                        LastMessageAt = groupChat.LastMessageAt,
+                        CompanyId = null,
+                        ProjectId = groupChat.ProjectId,
+                        IsActive = groupChat.IsActive,
+                        LastSyncedAt = groupChat.LastSyncedAt
+                    }
+                    : groupChat)
+                .ToList(),
             RelationshipLinks = snapshot.RelationshipLinks
                 .Where(x => !(x.SourceEntityKind == EntityKind.Company && string.Equals(x.SourceEntityId, normalizedId, StringComparison.OrdinalIgnoreCase))
                          && !(x.TargetEntityKind == EntityKind.Company && string.Equals(x.TargetEntityId, normalizedId, StringComparison.OrdinalIgnoreCase)))
@@ -209,6 +229,7 @@ public sealed class ContactManagementWorkspaceService
             Contacts = snapshot.Contacts,
             Companies = snapshot.Companies,
             Projects = projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = RebuildProjectLinks(snapshot.RelationshipLinks, project),
             TodoEntries = snapshot.TodoEntries,
             ClientIssues = snapshot.ClientIssues,
@@ -247,6 +268,23 @@ public sealed class ContactManagementWorkspaceService
                 .ToList(),
             Companies = snapshot.Companies,
             Projects = snapshot.Projects.Where(x => !string.Equals(x.Id, normalizedId, StringComparison.OrdinalIgnoreCase)).ToList(),
+            WeChatGroupChats = snapshot.WeChatGroupChats
+                .Select(groupChat => string.Equals(groupChat.ProjectId, normalizedId, StringComparison.OrdinalIgnoreCase)
+                    ? new WeChatGroupChatProfile
+                    {
+                        Id = groupChat.Id,
+                        AccountId = groupChat.AccountId,
+                        AccountDisplayName = groupChat.AccountDisplayName,
+                        WeChatUsername = groupChat.WeChatUsername,
+                        DisplayName = groupChat.DisplayName,
+                        LastMessageAt = groupChat.LastMessageAt,
+                        CompanyId = groupChat.CompanyId,
+                        ProjectId = null,
+                        IsActive = groupChat.IsActive,
+                        LastSyncedAt = groupChat.LastSyncedAt
+                    }
+                    : groupChat)
+                .ToList(),
             RelationshipLinks = snapshot.RelationshipLinks
                 .Where(x => !(x.SourceEntityKind == EntityKind.Project && string.Equals(x.SourceEntityId, normalizedId, StringComparison.OrdinalIgnoreCase))
                          && !(x.TargetEntityKind == EntityKind.Project && string.Equals(x.TargetEntityId, normalizedId, StringComparison.OrdinalIgnoreCase)))
@@ -282,6 +320,7 @@ public sealed class ContactManagementWorkspaceService
             Contacts = snapshot.Contacts,
             Companies = snapshot.Companies,
             Projects = snapshot.Projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = links,
             TodoEntries = snapshot.TodoEntries,
             ClientIssues = snapshot.ClientIssues,
@@ -305,6 +344,7 @@ public sealed class ContactManagementWorkspaceService
             Contacts = snapshot.Contacts,
             Companies = snapshot.Companies,
             Projects = snapshot.Projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = snapshot.RelationshipLinks.Where(x => !string.Equals(x.Id, normalizedId, StringComparison.OrdinalIgnoreCase)).ToList(),
             TodoEntries = snapshot.TodoEntries,
             ClientIssues = snapshot.ClientIssues,

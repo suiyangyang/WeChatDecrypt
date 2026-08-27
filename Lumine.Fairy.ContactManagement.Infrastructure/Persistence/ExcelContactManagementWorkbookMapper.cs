@@ -11,6 +11,7 @@ internal static class ExcelContactManagementWorkbookMapper
     private const string ContactsSheetName = "Contacts";
     private const string CompaniesSheetName = "Companies";
     private const string ProjectsSheetName = "Projects";
+    private const string WeChatGroupChatsSheetName = "WeChatGroupChats";
     private const string RelationshipLinksSheetName = "RelationshipLinks";
     private const string TodoEntriesSheetName = "TodoEntries";
     private const string ClientIssuesSheetName = "ClientIssues";
@@ -30,6 +31,7 @@ internal static class ExcelContactManagementWorkbookMapper
         var contactsSheet = GetRequiredSheet(workbook, ContactsSheetName, conflicts);
         var companiesSheet = GetRequiredSheet(workbook, CompaniesSheetName, conflicts);
         var projectsSheet = GetRequiredSheet(workbook, ProjectsSheetName, conflicts);
+        var groupChatsSheet = GetRequiredSheet(workbook, WeChatGroupChatsSheetName, conflicts);
         var relationshipSheet = GetRequiredSheet(workbook, RelationshipLinksSheetName, conflicts);
         var todoEntriesSheet = GetRequiredSheet(workbook, TodoEntriesSheetName, conflicts);
         var clientIssuesSheet = GetRequiredSheet(workbook, ClientIssuesSheetName, conflicts);
@@ -49,6 +51,7 @@ internal static class ExcelContactManagementWorkbookMapper
         var companyByName = companies.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
         var projects = ReadProjects(projectsSheet!, contactById, contactByName, companyById, companyByName, conflicts);
+        var groupChats = ReadWeChatGroupChats(groupChatsSheet!, conflicts);
         var projectById = projects.ToDictionary(item => item.Id, StringComparer.OrdinalIgnoreCase);
         var projectByName = projects.ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
 
@@ -72,6 +75,7 @@ internal static class ExcelContactManagementWorkbookMapper
             Contacts = contacts,
             Companies = companies,
             Projects = projects,
+            WeChatGroupChats = groupChats,
             RelationshipLinks = relationships,
             TodoEntries = todoEntries,
             ClientIssues = clientIssues,
@@ -92,6 +96,7 @@ internal static class ExcelContactManagementWorkbookMapper
         WriteContacts(workbook, snapshot.Contacts);
         WriteCompanies(workbook, snapshot.Companies);
         WriteProjects(workbook, snapshot.Projects, snapshot.Companies, snapshot.Contacts);
+        WriteWeChatGroupChats(workbook, snapshot.WeChatGroupChats);
         WriteRelationships(workbook, snapshot.RelationshipLinks, snapshot.Contacts, snapshot.Companies, snapshot.Projects);
         WriteTodoEntries(workbook, snapshot.TodoEntries);
         WriteClientIssues(workbook, snapshot.ClientIssues);
@@ -306,6 +311,40 @@ internal static class ExcelContactManagementWorkbookMapper
         }
 
         return relationships;
+    }
+
+    private static List<WeChatGroupChatProfile> ReadWeChatGroupChats(IXLWorksheet worksheet, List<ImportConflictItem> conflicts)
+    {
+        var headers = ReadHeaders(worksheet, ["WeChatUsername", "DisplayName"], WeChatGroupChatsSheetName, conflicts);
+        if (headers.Count == 0) return [];
+
+        var items = new List<WeChatGroupChatProfile>();
+        foreach (var row in EnumerateDataRows(worksheet))
+        {
+            var username = GetString(row, headers, "WeChatUsername");
+            if (string.IsNullOrWhiteSpace(username)) continue;
+            if (!TryParseNullableDateTimeOffset(GetString(row, headers, "LastMessageAt"), out var lastMessageAt)
+                || !TryParseDateTimeOffset(GetString(row, headers, "LastSyncedAt"), out var lastSyncedAt))
+            {
+                conflicts.Add(CreateRowConflict(WeChatGroupChatsSheetName, row.RowNumber(), "微信群聊时间字段无效。", "import.excel.wechat_group_chat.datetime.invalid"));
+                continue;
+            }
+
+            items.Add(new WeChatGroupChatProfile
+            {
+                Id = GetString(row, headers, "Id").NullIfWhiteSpace() ?? Guid.NewGuid().ToString("N"),
+                AccountId = GetString(row, headers, "AccountId"),
+                AccountDisplayName = GetString(row, headers, "AccountDisplayName"),
+                WeChatUsername = username,
+                DisplayName = GetString(row, headers, "DisplayName").NullIfWhiteSpace() ?? username,
+                LastMessageAt = lastMessageAt,
+                CompanyId = GetString(row, headers, "CompanyId").NullIfWhiteSpace(),
+                ProjectId = GetString(row, headers, "ProjectId").NullIfWhiteSpace(),
+                IsActive = ParseBool(GetString(row, headers, "IsActive"), defaultValue: true),
+                LastSyncedAt = lastSyncedAt
+            });
+        }
+        return items;
     }
 
     private static List<TodoEntry> ReadTodoEntries(IXLWorksheet worksheet, List<ImportConflictItem> conflicts)
@@ -558,6 +597,29 @@ internal static class ExcelContactManagementWorkbookMapper
             worksheet.Cell(row, 9).Value = JoinValues(item.GroupChats);
             worksheet.Cell(row, 10).Value = item.Notes;
             worksheet.Cell(row, 11).Value = item.IsActive;
+        }
+        worksheet.Columns().AdjustToContents();
+    }
+
+    private static void WriteWeChatGroupChats(XLWorkbook workbook, IReadOnlyList<WeChatGroupChatProfile> items)
+    {
+        var worksheet = workbook.Worksheets.Add(WeChatGroupChatsSheetName);
+        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
+        WriteHeaders(worksheet, headers);
+        for (var i = 0; i < items.Count; i++)
+        {
+            var row = i + 2;
+            var item = items[i];
+            worksheet.Cell(row, 1).Value = item.Id;
+            worksheet.Cell(row, 2).Value = item.AccountId;
+            worksheet.Cell(row, 3).Value = item.AccountDisplayName;
+            worksheet.Cell(row, 4).Value = item.WeChatUsername;
+            worksheet.Cell(row, 5).Value = item.DisplayName;
+            worksheet.Cell(row, 6).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
+            worksheet.Cell(row, 7).Value = item.CompanyId ?? string.Empty;
+            worksheet.Cell(row, 8).Value = item.ProjectId ?? string.Empty;
+            worksheet.Cell(row, 9).Value = item.IsActive;
+            worksheet.Cell(row, 10).Value = item.LastSyncedAt.ToString("O");
         }
         worksheet.Columns().AdjustToContents();
     }

@@ -9,6 +9,22 @@ namespace Lumine.Fairy.ContactManagement.Tests;
 public sealed class ContactMainWindowViewModelFilterTests
 {
     [Fact]
+    public void RelationshipTypeOptions_IncludeSelf()
+    {
+        var viewModel = CreateViewModel(new ContactManagementSnapshot());
+
+        Assert.Contains(ContactRelationshipType.Self, viewModel.RelationshipTypeOptions);
+
+        var contact = ContactItemViewModel.FromModel(new ContactProfile
+        {
+            Id = "contact-self",
+            FullName = "本人",
+            RelationshipType = ContactRelationshipType.Self
+        });
+        Assert.Equal("自己", contact.RelationshipTypeText);
+    }
+
+    [Fact]
     public void FilterTexts_RestrictContactsCompaniesAndProjects()
     {
         var viewModel = CreateViewModel(new ContactManagementSnapshot

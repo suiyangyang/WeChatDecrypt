@@ -15,6 +15,7 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     private readonly IDataImportService _dataImportService;
     private readonly IDataExportService _dataExportService;
     private readonly int _schemaVersion;
+    private readonly WeChatGroupChatDirectoryService? _groupChatDirectoryService;
     private RelationshipLinkItemViewModel? _trackedRelationship;
 
     public ContactMainWindowViewModel(
@@ -23,12 +24,14 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         IDataImportService dataImportService,
         IDataExportService dataExportService,
         int schemaVersion,
-        ContactManagementSnapshot initialSnapshot)
+        ContactManagementSnapshot initialSnapshot,
+        WeChatGroupChatDirectoryService? groupChatDirectoryService = null)
     {
         _workspaceService = workspaceService ?? throw new ArgumentNullException(nameof(workspaceService));
         _dataImportService = dataImportService ?? throw new ArgumentNullException(nameof(dataImportService));
         _dataExportService = dataExportService ?? throw new ArgumentNullException(nameof(dataExportService));
         _schemaVersion = schemaVersion;
+        _groupChatDirectoryService = groupChatDirectoryService;
         DataDirectoryText = $"数据库文件：{databaseFilePath}";
 
         var dataDirectory = Path.GetDirectoryName(databaseFilePath) ?? AppContext.BaseDirectory;
@@ -40,7 +43,7 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         RelationshipLinkTypeOptions = Enum.GetValues<RelationshipLinkType>();
 
         ApplySnapshot(initialSnapshot);
-        StatusText = "SQLite 数据已加载，可以开始维护联系人、公司、项目，并支持联系人域 JSON / Excel 导入导出。";
+        StatusText = "SQLite 数据已加载，可以开始维护联系人、公司、项目、微信群聊，并支持联系人域 JSON / Excel 导入导出。";
     }
 
     public string DataDirectoryText { get; }
@@ -65,6 +68,15 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _projectFilterText = string.Empty;
+
+    [ObservableProperty]
+    private string _groupChatFilterText = string.Empty;
+
+    [ObservableProperty]
+    private int _selectedGroupChatLookbackDays = 30;
+
+    [ObservableProperty]
+    private bool _showOnlyUnassignedGroupChats;
 
     [ObservableProperty]
     private string _importFilePath = string.Empty;
@@ -96,6 +108,9 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     private ProjectItemViewModel? _selectedProject;
 
     [ObservableProperty]
+    private WeChatGroupChatItemViewModel? _selectedGroupChat;
+
+    [ObservableProperty]
     private RelationshipLinkItemViewModel? _selectedRelationship;
 
     public ObservableCollection<ContactItemViewModel> Contacts { get; } = [];
@@ -109,6 +124,10 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     public ObservableCollection<ProjectItemViewModel> Projects { get; } = [];
 
     public ObservableCollection<ProjectItemViewModel> FilteredProjects { get; } = [];
+
+    public ObservableCollection<WeChatGroupChatItemViewModel> GroupChats { get; } = [];
+
+    public ObservableCollection<WeChatGroupChatItemViewModel> FilteredGroupChats { get; } = [];
 
     public ObservableCollection<RelationshipLinkItemViewModel> RelationshipLinks { get; } = [];
 
@@ -166,9 +185,11 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public bool IsProjectsPageSelected => SelectedMainTabIndex == 3;
 
+    public bool IsGroupChatsPageSelected => SelectedMainTabIndex == 4;
+
     public bool IsRelationshipsPageSelected => false;
 
-    public bool IsImportExportPageSelected => SelectedMainTabIndex == 4;
+    public bool IsImportExportPageSelected => SelectedMainTabIndex == 5;
 
     public bool HasFilteredContacts => FilteredContacts.Count > 0;
 
@@ -176,17 +197,25 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public bool HasFilteredProjects => FilteredProjects.Count > 0;
 
+    public bool HasFilteredGroupChats => FilteredGroupChats.Count > 0;
+
     public string ContactListSummaryText => BuildFilterSummaryText(FilteredContacts.Count, Contacts.Count, "条联系人", ContactFilterText);
 
     public string CompanyListSummaryText => BuildFilterSummaryText(FilteredCompanies.Count, Companies.Count, "家公司", CompanyFilterText);
 
     public string ProjectListSummaryText => BuildFilterSummaryText(FilteredProjects.Count, Projects.Count, "个项目", ProjectFilterText);
 
+    public string GroupChatListSummaryText => BuildFilterSummaryText(FilteredGroupChats.Count, GroupChats.Count, "个群聊", GroupChatFilterText);
+
     public string ContactEmptyStateText => BuildEmptyStateText("联系人", ContactFilterText);
 
     public string CompanyEmptyStateText => BuildEmptyStateText("公司", CompanyFilterText);
 
     public string ProjectEmptyStateText => BuildEmptyStateText("项目", ProjectFilterText);
+
+    public string GroupChatEmptyStateText => GroupChats.Count == 0
+        ? "尚未同步微信群聊，请点击“刷新最近群聊”。"
+        : BuildEmptyStateText("微信群聊", GroupChatFilterText);
 
     public string ImportDecisionHint => HasImportErrors
         ? "存在错误项，需先修正后才能提交导入。"
@@ -229,8 +258,31 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     public Task SaveProjectDraftAsync(ProjectItemViewModel draft)
         => SaveDraftAsync(draft, draft.ToModel(), SelectionTarget.Project, $"项目“{draft.Name}”已保存。", _workspaceService.UpsertProjectAsync);
 
+    public async Task SaveGroupChatDraftAsync(WeChatGroupChatItemViewModel draft)
+    {
+        if (_groupChatDirectoryService is null) throw new InvalidOperationException("微信群聊目录服务尚未初始化。");
+        await SaveDraftAsync(draft, draft.ToModel(), SelectionTarget.GroupChat, $"群聊“{draft.DisplayName}”的公司归属已保存。", _groupChatDirectoryService.UpsertAsync);
+    }
+
     public Task SaveRelationshipDraftAsync(RelationshipLinkItemViewModel draft)
         => SaveDraftAsync(draft, draft.ToModel(), SelectionTarget.Relationship, "关系记录已保存。", _workspaceService.UpsertRelationshipLinkAsync);
+
+    [RelayCommand]
+    private async Task RefreshGroupChatsAsync()
+    {
+        if (_groupChatDirectoryService is null)
+        {
+            StatusText = "微信群聊目录服务尚未初始化。";
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var snapshot = await _groupChatDirectoryService.RefreshAsync(TimeSpan.FromDays(Math.Clamp(SelectedGroupChatLookbackDays, 1, 365)));
+            ApplySnapshot(snapshot);
+            StatusText = $"已同步 {GroupChats.Count} 个最近微信群聊。";
+        });
+    }
 
     [RelayCommand]
     private async Task ReloadAsync()
@@ -437,6 +489,17 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         });
     }
 
+    public async Task SaveGroupChatAsync(WeChatGroupChatItemViewModel? item)
+    {
+        if (item is null)
+        {
+            StatusText = "请先选择群聊。";
+            return;
+        }
+
+        await SaveGroupChatDraftAsync(item);
+    }
+
     [RelayCommand]
     private async Task SaveRelationshipAsync()
     {
@@ -501,12 +564,31 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         SelectedProject = ResolveSelection(FilteredProjects, item => item.Id, SelectedProject?.Id, null, false);
     }
 
+    partial void OnGroupChatFilterTextChanged(string value)
+    {
+        RefreshFilteredGroupChats();
+        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+    }
+
+    partial void OnShowOnlyUnassignedGroupChatsChanged(bool value)
+    {
+        RefreshFilteredGroupChats();
+        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+    }
+
+    partial void OnSelectedGroupChatLookbackDaysChanged(int value)
+    {
+        RefreshFilteredGroupChats();
+        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+    }
+
     partial void OnSelectedMainTabIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsHomePageSelected));
         OnPropertyChanged(nameof(IsContactsPageSelected));
         OnPropertyChanged(nameof(IsCompaniesPageSelected));
         OnPropertyChanged(nameof(IsProjectsPageSelected));
+        OnPropertyChanged(nameof(IsGroupChatsPageSelected));
         OnPropertyChanged(nameof(IsImportExportPageSelected));
     }
 
@@ -577,6 +659,7 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
             ContactItemViewModel contact => contact.Id,
             CompanyItemViewModel company => company.Id,
             ProjectItemViewModel project => project.Id,
+            WeChatGroupChatItemViewModel groupChat => groupChat.Id,
             RelationshipLinkItemViewModel relationship => relationship.Id,
             _ => string.Empty
         };
@@ -596,17 +679,20 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         ReplaceCollection(Contacts, snapshot.Contacts.Select(ContactItemViewModel.FromModel));
         ReplaceCollection(Companies, snapshot.Companies.Select(CompanyItemViewModel.FromModel));
         ReplaceCollection(Projects, snapshot.Projects.Select(ProjectItemViewModel.FromModel));
+        ReplaceCollection(GroupChats, snapshot.WeChatGroupChats.Select(item => WeChatGroupChatItemViewModel.FromModel(item, CompanyOptions)));
         ReplaceCollection(RelationshipLinks, snapshot.RelationshipLinks.Select(RelationshipLinkItemViewModel.FromModel));
 
         RefreshFilteredContacts();
         RefreshFilteredCompanies();
         RefreshFilteredProjects();
+        RefreshFilteredGroupChats();
 
         RefreshLookupOptions();
 
         SelectedContact = ResolveSelection(FilteredContacts, item => item.Id, SelectedContact?.Id, preferredId, selectionTarget == SelectionTarget.Contact);
         SelectedCompany = ResolveSelection(FilteredCompanies, item => item.Id, SelectedCompany?.Id, preferredId, selectionTarget == SelectionTarget.Company);
         SelectedProject = ResolveSelection(FilteredProjects, item => item.Id, SelectedProject?.Id, preferredId, selectionTarget == SelectionTarget.Project);
+        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, preferredId, selectionTarget == SelectionTarget.GroupChat);
         SelectedRelationship = ResolveSelection(RelationshipLinks, item => item.Id, SelectedRelationship?.Id, preferredId, selectionTarget == SelectionTarget.Relationship);
 
         RefreshRelationshipEntityOptions();
@@ -679,6 +765,29 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         RaiseFilteredProjectsStateChanged();
     }
 
+    private void RefreshFilteredGroupChats()
+    {
+        IEnumerable<WeChatGroupChatItemViewModel> results = GroupChats;
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Clamp(SelectedGroupChatLookbackDays, 1, 365));
+        results = results.Where(item => item.LastMessageAt is null || item.LastMessageAt >= cutoff);
+        if (ShowOnlyUnassignedGroupChats)
+        {
+            results = results.Where(item => string.IsNullOrWhiteSpace(item.CompanyId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(GroupChatFilterText))
+        {
+            var keyword = GroupChatFilterText.Trim();
+            results = results.Where(item => item.DisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                || item.WeChatUsername.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                || item.AccountDisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                || item.CompanyName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+        }
+
+        ReplaceCollection(FilteredGroupChats, results);
+        RaiseFilteredGroupChatsStateChanged();
+    }
+
     private void RaiseFilteredContactsStateChanged()
     {
         OnPropertyChanged(nameof(HasFilteredContacts));
@@ -698,6 +807,13 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasFilteredProjects));
         OnPropertyChanged(nameof(ProjectListSummaryText));
         OnPropertyChanged(nameof(ProjectEmptyStateText));
+    }
+
+    private void RaiseFilteredGroupChatsStateChanged()
+    {
+        OnPropertyChanged(nameof(HasFilteredGroupChats));
+        OnPropertyChanged(nameof(GroupChatListSummaryText));
+        OnPropertyChanged(nameof(GroupChatEmptyStateText));
     }
 
     private static string BuildFilterSummaryText(int filteredCount, int totalCount, string unitText, string filterText)
@@ -721,6 +837,11 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
             Id = company.Id,
             DisplayName = company.DisplayName
         }));
+
+        foreach (var groupChat in GroupChats)
+        {
+            groupChat.SetCompanyOptions(CompanyOptions);
+        }
 
         ReplaceCollection(ContactOptions, Contacts.Select(static contact => new LookupOptionViewModel
         {
@@ -803,6 +924,7 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         Contact = 1,
         Company = 2,
         Project = 3,
-        Relationship = 4
+        Relationship = 4,
+        GroupChat = 5
     }
 }

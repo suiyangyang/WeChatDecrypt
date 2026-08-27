@@ -13,6 +13,7 @@ internal static class ContactDomainSnapshotFilter
             Contacts = snapshot.Contacts,
             Companies = snapshot.Companies,
             Projects = snapshot.Projects,
+            WeChatGroupChats = snapshot.WeChatGroupChats,
             RelationshipLinks = snapshot.RelationshipLinks,
             TodoEntries = [],
             ClientIssues = [],

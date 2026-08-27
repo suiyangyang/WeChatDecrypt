@@ -8,5 +8,6 @@ public enum ContactRelationshipType
     Family = 3,
     Customer = 4,
     Partner = 5,
-    Other = 6
+    Other = 6,
+    Self = 7
 }

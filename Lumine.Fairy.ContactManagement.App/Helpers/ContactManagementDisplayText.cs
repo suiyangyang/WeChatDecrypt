@@ -16,6 +16,7 @@ internal static class ContactManagementDisplayText
             ContactRelationshipType.Customer => "客户",
             ContactRelationshipType.Partner => "合作伙伴",
             ContactRelationshipType.Other => "其他",
+            ContactRelationshipType.Self => "自己",
             _ => value.ToString()
         };
     }

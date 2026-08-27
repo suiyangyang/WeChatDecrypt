@@ -76,6 +76,20 @@ public static class ContactDomainImportTemplateWriter
                     Notes = "导入前可删除或修改。"
                 }
             ],
+            WeChatGroupChats =
+            [
+                new WeChatGroupChatProfile
+                {
+                    Id = "sample-wechat-group-1",
+                    AccountId = "sample-wechat-account-1",
+                    AccountDisplayName = "示例微信账号",
+                    WeChatUsername = "@@sample-group-room",
+                    DisplayName = "示例公司项目群",
+                    CompanyId = companyId,
+                    LastMessageAt = DateTimeOffset.UtcNow,
+                    LastSyncedAt = DateTimeOffset.UtcNow
+                }
+            ],
             RelationshipLinks =
             [
                 new RelationshipLink

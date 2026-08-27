@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Abstractions\Lumine.Fairy.ContactManagement.Abstractions.csproj" />
+    <ProjectReference Include="..\src\Lumine.Fairy.Domain\Lumine.Fairy.Domain.csproj" />
   </ItemGroup>
 
 </Project>

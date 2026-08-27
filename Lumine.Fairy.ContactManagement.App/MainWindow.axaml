@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
 		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -7,13 +7,7 @@
 		x:Name="RootWindow"
 		x:Class="Lumine.Fairy.ContactManagement.App.MainWindow"
 		x:DataType="vm:ContactMainWindowViewModel"
-		Icon="avares://Lumine.Fairy.ContactManagement.App/Assets/contact-management.ico"
-		Width="860"
-		Height="540"
-		MinWidth="760"
-		MinHeight="480"
 		FontSize="13"
-		Title="Lumine.Fairy Contact Management"
 		mc:Ignorable="d">
 	<Grid RowDefinitions="Auto,*,Auto" Margin="14">
 		<Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
@@ -197,6 +191,59 @@
 					</Border>
 				</Grid>
 			</TabItem>
+			<TabItem Header="微信群聊" Width="90" FontSize="12">
+				<Grid Margin="0,4,0,0" RowDefinitions="Auto,*" RowSpacing="6">
+					<Border Padding="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="10">
+						<Grid ColumnDefinitions="Auto,Auto,Auto,220,*" ColumnSpacing="8">
+							<Button Content="刷新最近群聊" Command="{Binding RefreshGroupChatsCommand}" MinWidth="92" Height="28" />
+							<TextBlock Grid.Column="1" VerticalAlignment="Center" Text="最近" />
+							<TextBox Grid.Column="2" Width="58" Height="28" Text="{Binding SelectedGroupChatLookbackDays}" />
+							<TextBlock Grid.Column="3" VerticalAlignment="Center" Foreground="#64748B" Text="天" />
+							<StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+								<CheckBox VerticalAlignment="Center" Content="只看未分配公司" IsChecked="{Binding ShowOnlyUnassignedGroupChats}" />
+								<TextBox Width="180" Height="28" Watermark="筛选群聊" Text="{Binding GroupChatFilterText, UpdateSourceTrigger=PropertyChanged}" />
+								<TextBlock FontSize="11" VerticalAlignment="Center" Foreground="#64748B" Text="{Binding GroupChatListSummaryText}" />
+							</StackPanel>
+						</Grid>
+					</Border>
+
+					<Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
+						<Grid RowDefinitions="Auto,*">
+							<Grid ColumnDefinitions="1.55*,1.6*,1.5*,1.15*,0.65*" ColumnSpacing="8" Margin="10,8,10,4">
+								<TextBlock FontSize="12" FontWeight="SemiBold" Text="群聊" />
+								<TextBlock Grid.Column="1" FontSize="12" FontWeight="SemiBold" Text="账号 / 标识" />
+								<TextBlock Grid.Column="2" FontSize="12" FontWeight="SemiBold" Text="最近沟通" />
+								<TextBlock Grid.Column="3" FontSize="12" FontWeight="SemiBold" Text="所属公司" />
+								<TextBlock Grid.Column="4" FontSize="12" FontWeight="SemiBold" Text="操作" />
+							</Grid>
+							<ListBox Grid.Row="1" ItemsSource="{Binding FilteredGroupChats}" SelectedItem="{Binding SelectedGroupChat}" BorderThickness="0" Background="Transparent" IsVisible="{Binding HasFilteredGroupChats}">
+								<ListBox.ItemTemplate>
+									<DataTemplate x:DataType="vm:WeChatGroupChatItemViewModel">
+										<Border Padding="10,6" BorderBrush="#F1F5F9" BorderThickness="0,1,0,0">
+											<Grid ColumnDefinitions="1.55*,1.6*,1.5*,1.15*,0.65*" ColumnSpacing="8">
+												<TextBlock FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Text="{Binding DisplayName}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+												<TextBlock Grid.Column="1" FontSize="11" VerticalAlignment="Center" Foreground="#64748B" Text="{Binding IdentityText}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+												<TextBlock Grid.Column="2" FontSize="12" VerticalAlignment="Center" Text="{Binding LastMessageAtText}" />
+													<ComboBox Grid.Column="3" ItemsSource="{Binding CompanyOptions}" SelectedItem="{Binding SelectedCompanyOption, Mode=TwoWay}" Width="140" Height="28">
+														<ComboBox.ItemTemplate>
+															<DataTemplate x:DataType="vm:LookupOptionViewModel">
+																<TextBlock Text="{Binding DisplayName}" />
+															</DataTemplate>
+														</ComboBox.ItemTemplate>
+													</ComboBox>
+												<Button Grid.Column="4" Content="保存" Click="SaveGroupChat_Click" MinWidth="48" Height="28" />
+											</Grid>
+										</Border>
+									</DataTemplate>
+								</ListBox.ItemTemplate>
+							</ListBox>
+							<Border Grid.Row="1" Margin="10,8,10,10" Padding="12" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" IsVisible="{Binding !HasFilteredGroupChats}">
+								<TextBlock FontSize="12" Foreground="#64748B" Text="{Binding GroupChatEmptyStateText}" TextWrapping="Wrap" />
+							</Border>
+						</Grid>
+					</Border>
+				</Grid>
+			</TabItem>
 			<TabItem Header="导入导出" Width="90" FontSize="11">
 				<Grid Margin="0,6,0,0" ColumnDefinitions="1.12*,12,*" ColumnSpacing="0">
 					<StackPanel Spacing="10">
@@ -360,4 +407,4 @@
 			</StackPanel>
 		</Border>
 	</Grid>
-</Window>
+</UserControl>

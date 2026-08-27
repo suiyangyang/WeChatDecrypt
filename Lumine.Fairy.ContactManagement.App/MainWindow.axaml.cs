@@ -7,7 +7,7 @@ using Lumine.Fairy.ContactManagement.App.ViewModels;
 
 namespace Lumine.Fairy.ContactManagement.App;
 
-public partial class MainWindow : Window
+public partial class MainWindow : UserControl
 {
     public MainWindow()
     {
@@ -21,7 +21,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null)
+        {
+            return;
+        }
+
+        var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "选择导入 JSON / Excel 文件",
             AllowMultiple = false,
@@ -48,7 +54,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var pickerResult = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null)
+        {
+            return;
+        }
+
+        var pickerResult = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "选择导出 JSON / Excel 文件",
             SuggestedFileName = Path.GetFileName(viewModel.ExportFilePath),
@@ -80,7 +92,7 @@ public partial class MainWindow : Window
         viewModel.SelectedContact = null;
         var draft = ContactItemViewModel.CreateNew();
         var dialog = new ContactEditorWindow(draft, viewModel.RelationshipTypeOptions, viewModel.CompanyOptions.ToList(), viewModel.ProjectOptions.ToList());
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
@@ -114,7 +126,7 @@ public partial class MainWindow : Window
         viewModel.SelectedCompany = null;
         var draft = CompanyItemViewModel.CreateNew();
         var dialog = new CompanyEditorWindow(draft);
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
@@ -148,7 +160,7 @@ public partial class MainWindow : Window
         viewModel.SelectedProject = null;
         var draft = ProjectItemViewModel.CreateNew();
         var dialog = new ProjectEditorWindow(draft, viewModel.CompanyOptions.ToList(), viewModel.ContactOptions.ToList());
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
@@ -172,6 +184,15 @@ public partial class MainWindow : Window
         await EditSelectedProjectAsync();
     }
 
+    private async void SaveGroupChat_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: WeChatGroupChatItemViewModel item }
+            && DataContext is ContactMainWindowViewModel viewModel)
+        {
+            await viewModel.SaveGroupChatAsync(item);
+        }
+    }
+
     private async Task EditSelectedContactAsync()
     {
         if (DataContext is not ContactMainWindowViewModel viewModel || viewModel.SelectedContact is null)
@@ -181,7 +202,7 @@ public partial class MainWindow : Window
 
         var draft = ContactItemViewModel.FromModel(viewModel.SelectedContact.ToModel());
         var dialog = new ContactEditorWindow(draft, viewModel.RelationshipTypeOptions, viewModel.CompanyOptions.ToList(), viewModel.ProjectOptions.ToList());
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
@@ -199,7 +220,7 @@ public partial class MainWindow : Window
 
         var draft = CompanyItemViewModel.FromModel(viewModel.SelectedCompany.ToModel());
         var dialog = new CompanyEditorWindow(draft);
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
@@ -217,13 +238,20 @@ public partial class MainWindow : Window
 
         var draft = ProjectItemViewModel.FromModel(viewModel.SelectedProject.ToModel());
         var dialog = new ProjectEditorWindow(draft, viewModel.CompanyOptions.ToList(), viewModel.ContactOptions.ToList());
-        var confirmed = await dialog.ShowDialog<bool>(this);
+        var confirmed = await ShowDialogAsync(dialog);
         if (!confirmed)
         {
             return;
         }
 
         await viewModel.SaveProjectDraftAsync(draft);
+    }
+
+    private async Task<bool> ShowDialogAsync<TWindow>(TWindow dialog)
+        where TWindow : Window
+    {
+        var owner = TopLevel.GetTopLevel(this) as Window;
+        return owner is null ? false : await dialog.ShowDialog<bool>(owner);
     }
 
 }

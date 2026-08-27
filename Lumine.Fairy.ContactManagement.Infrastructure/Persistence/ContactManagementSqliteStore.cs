@@ -91,6 +91,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                 Contacts = LoadContacts(connection),
                 Companies = LoadCompanies(connection),
                 Projects = LoadProjects(connection),
+                WeChatGroupChats = LoadWeChatGroupChats(connection),
                 RelationshipLinks = LoadRelationshipLinks(connection),
                 TodoEntries = LoadTodoEntries(connection),
                 ClientIssues = LoadClientIssues(connection),
@@ -119,6 +120,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
 
             ExecuteNonQuery(connection, transaction, "DELETE FROM relationship_links;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM projects;");
+            ExecuteNonQuery(connection, transaction, "DELETE FROM wechat_group_chats;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM companies;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM contacts;");
             ExecuteNonQuery(connection, transaction, "DELETE FROM daily_reports;");
@@ -129,6 +131,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
             SaveContacts(connection, transaction, snapshot.Contacts);
             SaveCompanies(connection, transaction, snapshot.Companies);
             SaveProjects(connection, transaction, snapshot.Projects);
+            SaveWeChatGroupChats(connection, transaction, snapshot.WeChatGroupChats);
             SaveRelationshipLinks(connection, transaction, snapshot.RelationshipLinks);
             SaveTodoEntries(connection, transaction, snapshot.TodoEntries);
             SaveClientIssues(connection, transaction, snapshot.ClientIssues);
@@ -186,6 +189,19 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                     group_chats_json    TEXT NOT NULL DEFAULT '[]',
                     notes               TEXT NOT NULL DEFAULT '',
                     is_active           INTEGER NOT NULL DEFAULT 1
+                );
+
+                CREATE TABLE IF NOT EXISTS wechat_group_chats (
+                    id                  TEXT PRIMARY KEY,
+                    account_id          TEXT NOT NULL,
+                    account_display_name TEXT NOT NULL DEFAULT '',
+                    wechat_username     TEXT NOT NULL,
+                    display_name        TEXT NOT NULL,
+                    last_message_at     TEXT NULL,
+                    company_id          TEXT NULL,
+                    project_id          TEXT NULL,
+                    is_active           INTEGER NOT NULL DEFAULT 1,
+                    last_synced_at      TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS relationship_links (
@@ -248,6 +264,8 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                 CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON contacts(full_name);
                 CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
                 CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_wechat_group_chat_identity ON wechat_group_chats(account_id, wechat_username);
+                CREATE INDEX IF NOT EXISTS idx_wechat_group_chats_company ON wechat_group_chats(company_id);
                 CREATE INDEX IF NOT EXISTS idx_relationship_links_source ON relationship_links(source_entity_kind, source_entity_id);
                 CREATE INDEX IF NOT EXISTS idx_relationship_links_target ON relationship_links(target_entity_kind, target_entity_id);
                 CREATE INDEX IF NOT EXISTS idx_todo_entries_work_date ON todo_entries(work_date, sort_order);
@@ -311,51 +329,76 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                     version = 2;
                     break;
                 case 2:
-                    using (var alter = connection.CreateCommand())
-                    {
-                        alter.CommandText = "ALTER TABLE projects ADD COLUMN delivery_date TEXT NULL;";
-                        alter.ExecuteNonQuery();
-                    }
+                    AddColumnIfMissing(connection, "projects", "delivery_date", "TEXT NULL");
 
                     SetSchemaVersion(connection, 3);
                     version = 3;
                     break;
                 case 3:
-                    using (var alterContactsCompany = connection.CreateCommand())
-                    {
-                        alterContactsCompany.CommandText = "ALTER TABLE contacts ADD COLUMN company_ids_json TEXT NOT NULL DEFAULT '[]';";
-                        alterContactsCompany.ExecuteNonQuery();
-                    }
-
-                    using (var alterContactsProject = connection.CreateCommand())
-                    {
-                        alterContactsProject.CommandText = "ALTER TABLE contacts ADD COLUMN project_ids_json TEXT NOT NULL DEFAULT '[]';";
-                        alterContactsProject.ExecuteNonQuery();
-                    }
-
-                    using (var alterProjectsChat = connection.CreateCommand())
-                    {
-                        alterProjectsChat.CommandText = "ALTER TABLE projects ADD COLUMN group_chats_json TEXT NOT NULL DEFAULT '[]';";
-                        alterProjectsChat.ExecuteNonQuery();
-                    }
+                    AddColumnIfMissing(connection, "contacts", "company_ids_json", "TEXT NOT NULL DEFAULT '[]'");
+                    AddColumnIfMissing(connection, "contacts", "project_ids_json", "TEXT NOT NULL DEFAULT '[]'");
+                    AddColumnIfMissing(connection, "projects", "group_chats_json", "TEXT NOT NULL DEFAULT '[]'");
 
                     SetSchemaVersion(connection, 4);
                     version = 4;
                     break;
                 case 4:
-                    using (var alterContactsWeChatIds = connection.CreateCommand())
-                    {
-                        alterContactsWeChatIds.CommandText = "ALTER TABLE contacts ADD COLUMN wechat_ids_json TEXT NOT NULL DEFAULT '[]';";
-                        alterContactsWeChatIds.ExecuteNonQuery();
-                    }
+                    AddColumnIfMissing(connection, "contacts", "wechat_ids_json", "TEXT NOT NULL DEFAULT '[]'");
 
                     SetSchemaVersion(connection, 5);
                     version = 5;
+                    break;
+                case 5:
+                    using (var create = connection.CreateCommand())
+                    {
+                        create.CommandText = """
+                            CREATE TABLE IF NOT EXISTS wechat_group_chats (
+                                id TEXT PRIMARY KEY,
+                                account_id TEXT NOT NULL,
+                                wechat_username TEXT NOT NULL,
+                                display_name TEXT NOT NULL,
+                                last_message_at TEXT NULL,
+                                company_id TEXT NULL,
+                                project_id TEXT NULL,
+                                is_active INTEGER NOT NULL DEFAULT 1,
+                                last_synced_at TEXT NOT NULL
+                            );
+                            CREATE UNIQUE INDEX IF NOT EXISTS idx_wechat_group_chat_identity ON wechat_group_chats(account_id, wechat_username);
+                            CREATE INDEX IF NOT EXISTS idx_wechat_group_chats_company ON wechat_group_chats(company_id);
+                            """;
+                        create.ExecuteNonQuery();
+                    }
+
+                    SetSchemaVersion(connection, 6);
+                    version = 6;
+                    break;
+                case 6:
+                    AddColumnIfMissing(connection, "wechat_group_chats", "account_display_name", "TEXT NOT NULL DEFAULT ''");
+
+                    SetSchemaVersion(connection, 7);
+                    version = 7;
                     break;
                 default:
                     throw new InvalidOperationException($"不支持从 schemaVersion={currentVersion} 升级到 {targetVersion}。");
             }
         }
+    }
+
+    private static void AddColumnIfMissing(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+    {
+        using var exists = connection.CreateCommand();
+        exists.CommandText = "SELECT 1 FROM pragma_table_info($table) WHERE name=$column LIMIT 1;";
+        exists.Parameters.AddWithValue("$table", tableName);
+        exists.Parameters.AddWithValue("$column", columnName);
+        if (exists.ExecuteScalar() is not null)
+        {
+            return;
+        }
+
+        // 迁移中的表名、字段名和字段定义均为代码内常量，不接受外部输入。
+        using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
     }
 
     private static void SetSchemaVersion(SqliteConnection connection, int schemaVersion)
@@ -495,6 +538,37 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                 Title = reader.GetString(7),
                 IsPrimary = reader.GetInt64(8) != 0,
                 Notes = reader.GetString(9)
+            });
+        }
+
+        return items;
+    }
+
+    private static List<WeChatGroupChatProfile> LoadWeChatGroupChats(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, account_id, account_display_name, wechat_username, display_name, last_message_at, company_id, project_id, is_active, last_synced_at
+            FROM wechat_group_chats
+            ORDER BY last_message_at DESC, display_name ASC, id ASC;
+            """;
+
+        using var reader = command.ExecuteReader();
+        var items = new List<WeChatGroupChatProfile>();
+        while (reader.Read())
+        {
+            items.Add(new WeChatGroupChatProfile
+            {
+                Id = reader.GetString(0),
+                AccountId = reader.GetString(1),
+                AccountDisplayName = reader.GetString(2),
+                WeChatUsername = reader.GetString(3),
+                DisplayName = reader.GetString(4),
+                LastMessageAt = reader.IsDBNull(5) ? null : ParseDateTimeOffset(reader.GetString(5)),
+                CompanyId = reader.IsDBNull(6) ? null : reader.GetString(6),
+                ProjectId = reader.IsDBNull(7) ? null : reader.GetString(7),
+                IsActive = reader.GetInt64(8) != 0,
+                LastSyncedAt = ParseDateTimeOffset(reader.GetString(9))
             });
         }
 
@@ -681,6 +755,30 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
             command.Parameters.AddWithValue("$group_chats_json", SerializeStringList(project.GroupChats));
             command.Parameters.AddWithValue("$notes", project.Notes);
             command.Parameters.AddWithValue("$is_active", project.IsActive ? 1 : 0);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static void SaveWeChatGroupChats(SqliteConnection connection, SqliteTransaction transaction, IReadOnlyList<WeChatGroupChatProfile> groupChats)
+    {
+        foreach (var groupChat in groupChats)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO wechat_group_chats(id, account_id, account_display_name, wechat_username, display_name, last_message_at, company_id, project_id, is_active, last_synced_at)
+                VALUES($id, $account_id, $account_display_name, $wechat_username, $display_name, $last_message_at, $company_id, $project_id, $is_active, $last_synced_at);
+                """;
+            command.Parameters.AddWithValue("$id", groupChat.Id);
+            command.Parameters.AddWithValue("$account_id", groupChat.AccountId);
+            command.Parameters.AddWithValue("$account_display_name", groupChat.AccountDisplayName);
+            command.Parameters.AddWithValue("$wechat_username", groupChat.WeChatUsername);
+            command.Parameters.AddWithValue("$display_name", groupChat.DisplayName);
+            command.Parameters.AddWithValue("$last_message_at", groupChat.LastMessageAt.HasValue ? FormatDateTimeOffset(groupChat.LastMessageAt.Value) : DBNull.Value);
+            command.Parameters.AddWithValue("$company_id", (object?)groupChat.CompanyId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$project_id", (object?)groupChat.ProjectId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$is_active", groupChat.IsActive ? 1 : 0);
+            command.Parameters.AddWithValue("$last_synced_at", FormatDateTimeOffset(groupChat.LastSyncedAt));
             command.ExecuteNonQuery();
         }
     }

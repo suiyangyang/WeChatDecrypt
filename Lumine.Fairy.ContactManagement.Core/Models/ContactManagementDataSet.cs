@@ -7,6 +7,7 @@ public sealed class ContactManagementDataSet
     public List<ContactProfile> Contacts { get; init; } = [];
     public List<CompanyProfile> Companies { get; init; } = [];
     public List<ProjectProfile> Projects { get; init; } = [];
+    public List<WeChatGroupChatProfile> WeChatGroupChats { get; init; } = [];
     public List<RelationshipLink> RelationshipLinks { get; init; } = [];
     public List<TodoEntry> TodoEntries { get; init; } = [];
     public List<ClientIssueEntry> ClientIssues { get; init; } = [];
@@ -18,6 +19,7 @@ public sealed class ContactManagementDataSet
         Contacts = Contacts,
         Companies = Companies,
         Projects = Projects,
+        WeChatGroupChats = WeChatGroupChats,
         RelationshipLinks = RelationshipLinks,
         TodoEntries = TodoEntries,
         ClientIssues = ClientIssues,
@@ -34,6 +36,7 @@ public sealed class ContactManagementDataSet
             Contacts = [.. snapshot.Contacts],
             Companies = [.. snapshot.Companies],
             Projects = [.. snapshot.Projects],
+            WeChatGroupChats = [.. snapshot.WeChatGroupChats],
             RelationshipLinks = [.. snapshot.RelationshipLinks],
             TodoEntries = [.. snapshot.TodoEntries],
             ClientIssues = [.. snapshot.ClientIssues],

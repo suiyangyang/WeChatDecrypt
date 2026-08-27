@@ -44,6 +44,12 @@ internal static class ContactManagementImportCommitter
             UpsertProject(projects, project);
         }
 
+        var groupChats = currentSnapshot.WeChatGroupChats.Select(Clone).ToList();
+        foreach (var groupChat in importSnapshot.WeChatGroupChats)
+        {
+            UpsertGroupChat(groupChats, groupChat);
+        }
+
         var relationships = currentSnapshot.RelationshipLinks.Select(Clone).ToList();
         foreach (var relationship in importSnapshot.RelationshipLinks)
         {
@@ -104,6 +110,7 @@ internal static class ContactManagementImportCommitter
             Contacts = contacts,
             Companies = companies,
             Projects = projects,
+            WeChatGroupChats = groupChats,
             RelationshipLinks = relationships,
             TodoEntries = todoEntries,
             ClientIssues = clientIssues,
@@ -188,6 +195,17 @@ internal static class ContactManagementImportCommitter
         }
 
         items.Add(Clone(incoming));
+    }
+
+    private static void UpsertGroupChat(List<WeChatGroupChatProfile> items, WeChatGroupChatProfile incoming)
+    {
+        var index = items.FindIndex(existing =>
+            string.Equals(existing.Id, incoming.Id, StringComparison.OrdinalIgnoreCase)
+            || (string.Equals(existing.AccountId, incoming.AccountId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(existing.WeChatUsername, incoming.WeChatUsername, StringComparison.OrdinalIgnoreCase)));
+
+        if (index >= 0) items[index] = Clone(incoming);
+        else items.Add(Clone(incoming));
     }
 
     private static void UpsertRelationship(List<RelationshipLink> items, RelationshipLink incoming)
@@ -309,6 +327,20 @@ internal static class ContactManagementImportCommitter
         GroupChats = [.. item.GroupChats],
         Notes = item.Notes,
         IsActive = item.IsActive
+    };
+
+    private static WeChatGroupChatProfile Clone(WeChatGroupChatProfile item) => new()
+    {
+        Id = item.Id,
+        AccountId = item.AccountId,
+        AccountDisplayName = item.AccountDisplayName,
+        WeChatUsername = item.WeChatUsername,
+        DisplayName = item.DisplayName,
+        LastMessageAt = item.LastMessageAt,
+        CompanyId = item.CompanyId,
+        ProjectId = item.ProjectId,
+        IsActive = item.IsActive,
+        LastSyncedAt = item.LastSyncedAt
     };
 
     private static RelationshipLink Clone(RelationshipLink item) => new()

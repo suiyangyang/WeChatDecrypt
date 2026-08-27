@@ -11,8 +11,10 @@
     <ProjectReference Include="..\Lumine.Fairy.AgentCore\Lumine.Fairy.AgentCore.csproj" />
     <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Abstractions\Lumine.Fairy.ContactManagement.Abstractions.csproj" />
     <ProjectReference Include="..\Lumine.Fairy.ContactManagement.Core\Lumine.Fairy.ContactManagement.Core.csproj" />
+    <ProjectReference Include="..\src\Lumine.Fairy.Domain\Lumine.Fairy.Domain.csproj" />
+    <ProjectReference Include="..\src\Lumine.Fairy.Infrastructure\Lumine.Fairy.Infrastructure.csproj" />
     <PackageReference Include="ClosedXML" Version="0.105.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

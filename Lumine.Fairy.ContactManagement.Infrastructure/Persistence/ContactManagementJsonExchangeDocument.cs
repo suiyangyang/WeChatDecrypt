@@ -12,6 +12,8 @@ internal sealed class ContactManagementJsonExchangeDocument
 
     public List<ProjectProfile> Projects { get; set; } = [];
 
+    public List<WeChatGroupChatProfile> WeChatGroupChats { get; set; } = [];
+
     public List<RelationshipLink> RelationshipLinks { get; set; } = [];
 
     public List<TodoEntry> TodoEntries { get; set; } = [];
@@ -27,6 +29,7 @@ internal sealed class ContactManagementJsonExchangeDocument
         Contacts = Contacts,
         Companies = Companies,
         Projects = Projects,
+        WeChatGroupChats = WeChatGroupChats,
         RelationshipLinks = RelationshipLinks,
         TodoEntries = TodoEntries,
         ClientIssues = ClientIssues,
@@ -42,6 +45,7 @@ internal sealed class ContactManagementJsonExchangeDocument
             Contacts = [.. snapshot.Contacts],
             Companies = [.. snapshot.Companies],
             Projects = [.. snapshot.Projects],
+            WeChatGroupChats = [.. snapshot.WeChatGroupChats],
             RelationshipLinks = [.. snapshot.RelationshipLinks],
             TodoEntries = [.. snapshot.TodoEntries],
             ClientIssues = [.. snapshot.ClientIssues],
