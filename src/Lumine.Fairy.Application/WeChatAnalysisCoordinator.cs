@@ -13,7 +13,7 @@ public sealed class WeChatAnalysisCoordinator(
     Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? companyResolver = null)
 {
     private static readonly TimeSpan WeChatStageTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan QwenPawStageTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan QwenPawStageTimeout = TimeSpan.FromMinutes(11);
     private readonly TodoService _todos = todos;
     private readonly Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? _companyResolver = companyResolver;
 
@@ -40,24 +40,24 @@ public sealed class WeChatAnalysisCoordinator(
             if (!Settings.EnableWhitelist)
                 allowedSessions = allowedSessions.Take(1).ToList();
 
-            string? lastResult = null;
-            var analyzedSessionCount = 0;
+            var workItems = new List<WeChatAnalysisWorkItem>();
             foreach (var session in allowedSessions)
             {
                 progress.SetContext(account.DisplayName, session.DisplayName);
-                var messages = await RunStageAsync(progress, "read-messages", "正在读取最近消息", token => weChat.GetLatestMessagesAsync(account.Id, session.Username, 50, token), cancellationToken, WeChatStageTimeout);
+                var readLimit = Settings.AutomaticMode == WeChatAutomaticAnalysisMode.Unanalyzed
+                    ? WeChatAnalysisSelection.UnanalyzedMessageReadLimit
+                    : WeChatAnalysisSelection.DefaultMessageReadLimit;
+                var messages = await RunStageAsync(progress, "read-messages", "正在读取最近消息", token => weChat.GetLatestMessagesAsync(account.Id, session.Username, readLimit, token), cancellationToken, WeChatStageTimeout);
                 if (Settings.AutomaticMode != WeChatAutomaticAnalysisMode.Unanalyzed)
                     messages = WeChatAnalysisSelection.SelectMessages(messages, Settings.AutomaticMode, null);
                 if (messages.Count == 0) continue;
-
-                lastResult = await AnalyzeMessagesCoreAsync(account, session, messages, agentId, progress, cancellationToken);
-                analyzedSessionCount++;
+                workItems.Add(new WeChatAnalysisWorkItem(account, session, messages));
             }
 
-            if (analyzedSessionCount == 0)
+            if (workItems.Count == 0)
                 throw FailAndCreateException(progress, "read-messages", "匹配的微信会话没有可分析的新消息。");
 
-            return lastResult!;
+            return await AnalyzeRoundAsync(workItems, agentId, progress, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -79,10 +79,83 @@ public sealed class WeChatAnalysisCoordinator(
             throw new InvalidOperationException(error);
         }
         progress.Complete("read-messages", $"已读取 {messages.Count} 条增量消息");
-        return await AnalyzeMessagesCoreAsync(account, session, messages, agentId, progress, cancellationToken);
+        var item = new WeChatAnalysisWorkItem(account, session, messages);
+        return await AnalyzeRoundAsync([item], agentId, progress, cancellationToken);
     }
 
-    private async Task<string> AnalyzeMessagesCoreAsync(ChatAccount account, ChatSession session, IReadOnlyList<ChatMessage> messages, string agentId, AnalysisProgressTracker progress, CancellationToken cancellationToken)
+    internal Task<string> AnalyzeIncrementalRoundAsync(
+        IReadOnlyList<WeChatAnalysisWorkItem> workItems,
+        string agentId,
+        Func<WeChatAnalysisWorkItem, Task>? onItemCompleted,
+        CancellationToken cancellationToken = default)
+    {
+        var first = workItems.FirstOrDefault()
+                    ?? throw new InvalidOperationException("本轮没有可分析的新消息。");
+        var progress = CreateProgress(first.Account.DisplayName, first.Session.DisplayName);
+        return AnalyzeRoundAsync(workItems, agentId, progress, cancellationToken, onItemCompleted);
+    }
+
+    private async Task<string> AnalyzeRoundAsync(
+        IReadOnlyList<WeChatAnalysisWorkItem> workItems,
+        string agentId,
+        AnalysisProgressTracker progress,
+        CancellationToken cancellationToken,
+        Func<WeChatAnalysisWorkItem, Task>? onItemCompleted = null)
+    {
+        if (workItems.Count == 0) throw new InvalidOperationException("本轮没有可分析的新消息。");
+
+        var roundSessionId = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}-{Guid.NewGuid():N}";
+        var roundTitle = $"聊天记录分析_{DateTimeOffset.Now:yyyyMMdd_HHmm}";
+        progress.SetRound(roundTitle, workItems.Count, workItems.Sum(x => x.Messages.Count));
+        await RunStageAsync(
+            progress,
+            "qwen-send",
+            "正在创建本轮 QwenPaw 分析会话",
+            async token =>
+            {
+                await qwenPaw.CreateSessionAsync(roundSessionId, roundTitle, token);
+                return true;
+            },
+            cancellationToken,
+            QwenPawStageTimeout,
+            "本轮 QwenPaw 分析会话已创建");
+
+        string? lastResult = null;
+        for (var index = 0; index < workItems.Count; index++)
+        {
+            var item = workItems[index];
+            progress.SetContext(item.Account.DisplayName, item.Session.DisplayName);
+            progress.SetContact(index + 1);
+            progress.Start("read-messages", $"已读取 {item.Messages.Count} 条本联系人新增消息");
+            progress.Complete("read-messages", $"已读取 {item.Messages.Count} 条本联系人新增消息");
+
+            lastResult = await AnalyzeMessagesCoreAsync(
+                item.Account,
+                item.Session,
+                item.Messages,
+                agentId,
+                roundSessionId,
+                progress,
+                cancellationToken);
+
+            progress.CompleteContact();
+            if (onItemCompleted is not null)
+                await onItemCompleted(item);
+        }
+
+        progress.Start("complete", "正在完成本轮分析");
+        progress.Complete("complete", $"本轮已完成 {workItems.Count} 个联系人");
+        return lastResult!;
+    }
+
+    private async Task<string> AnalyzeMessagesCoreAsync(
+        ChatAccount account,
+        ChatSession session,
+        IReadOnlyList<ChatMessage> messages,
+        string agentId,
+        string roundSessionId,
+        AnalysisProgressTracker progress,
+        CancellationToken cancellationToken)
     {
         progress.Start("qwen-send", "正在提交分析请求");
         progress.Complete("qwen-send", "分析请求已提交");
@@ -93,7 +166,7 @@ public sealed class WeChatAnalysisCoordinator(
             progress,
             "qwen-analyze",
             "QwenPaw 正在理解消息并生成结构化结果",
-            token => qwenPaw.ChatAsync(agentId, prompt, token),
+            token => qwenPaw.ChatAsync(agentId, prompt, roundSessionId, token),
             cancellationToken,
             QwenPawStageTimeout,
             "QwenPaw 已返回分析结果");
@@ -103,7 +176,8 @@ public sealed class WeChatAnalysisCoordinator(
         try
         {
             analysis = result.Analysis
-                       ?? throw new InvalidOperationException("QwenPaw 未返回有效的微信分析 JSON，消息游标不会推进。");
+                       ?? throw new InvalidOperationException(
+                           $"QwenPaw 未返回有效的微信分析 JSON，消息游标不会推进。（响应文本长度：{result.Text.Length}，会话：{result.SessionId ?? "未知"}）");
             progress.Complete("parse-result", $"已识别 {analysis.Todos?.Count ?? 0} 个 TODO 候选、{analysis.Questions?.Count ?? 0} 个客户提问");
         }
         catch (Exception ex)
@@ -205,8 +279,6 @@ public sealed class WeChatAnalysisCoordinator(
             $"analysis:{account.Id}:{session.Username}:{messages.Max(x => x.Id)}"), cancellationToken);
 
             progress.Complete("persist", "TODO 候选和通知已保存");
-            progress.Start("complete", "正在完成本次分析");
-            progress.Complete("complete", "本次微信分析已完成");
             return result.Text;
         }
         catch (Exception ex)
@@ -329,10 +401,12 @@ public sealed class WeChatAnalysisCoordinator(
         var contentTypes = settings.ContentTypes.Count == 0
             ? new[] { WeChatAnalysisContentType.Todo, WeChatAnalysisContentType.CustomerQuestion }
             : settings.ContentTypes.Distinct().ToArray();
+        builder.AppendLine("你正在处理一个分析轮次中的一个联系人。只分析本提示词中当前联系人区域的消息，不要引用本轮其他联系人或历史上下文。");
         builder.AppendLine($"请分析下面的微信聊天内容，仅识别用户选择的内容类型：{string.Join("、", contentTypes.Select(GetContentTypeName))}。");
         if (contentTypes.Contains(WeChatAnalysisContentType.CustomerQuestion))
             builder.AppendLine("客户提问仅指客户在消息中@我并提出问题，且我在该问题后 10 分钟内没有给出回复；请据此识别并生成 clarification question。");
-        builder.AppendLine("请尽量只返回 JSON，结构为 AnalysisResult；如果没有事项，decision 返回 no_action。");
+        builder.AppendLine("最终只返回一个合法 JSON 对象，不要返回 Markdown 代码块、解释文字或推理过程。JSON 必须包含 decision、todos、intents、questions、sourceRefs 五个字段；没有结果时使用空数组，并将 decision 设为 no_action。只输出 ToDo 和客户提问，未选择的类型必须返回空数组。");
+        builder.AppendLine("每个 sourceRefs 必须使用下面消息中的消息 ID；不要编造消息 ID。");
         builder.AppendLine($"账号：{account.DisplayName}");
         builder.AppendLine($"会话：{session.DisplayName}");
         builder.AppendLine("聊天内容：");
@@ -366,6 +440,13 @@ public sealed class WeChatAnalysisCoordinator(
         => notification.Payload.TryGetValue(key, out var value) ? value?.ToString() : null;
 }
 
+internal sealed record WeChatAnalysisWorkItem(
+    ChatAccount Account,
+    ChatSession Session,
+    IReadOnlyList<ChatMessage> Messages,
+    string? CursorKey = null,
+    string? Cursor = null);
+
 internal sealed class AnalysisProgressTracker
 {
     private readonly Action<AnalysisProgressSnapshot> _publish;
@@ -395,6 +476,38 @@ internal sealed class AnalysisProgressTracker
     public string AccountDisplayName { get; private set; }
     public string ConversationDisplayName { get; private set; }
     public DateTimeOffset StartedAt { get; }
+    public string RoundTitle { get; private set; } = string.Empty;
+    public int TotalContacts { get; private set; }
+    public int TotalMessages { get; private set; }
+    public int CurrentContactIndex { get; private set; }
+    public int CompletedContacts { get; private set; }
+    public string Notice { get; private set; } = string.Empty;
+
+    public void SetRound(string roundTitle, int totalContacts, int totalMessages)
+    {
+        RoundTitle = roundTitle;
+        TotalContacts = totalContacts;
+        TotalMessages = totalMessages;
+        Emit();
+    }
+
+    public void SetContact(int index)
+    {
+        CurrentContactIndex = Math.Clamp(index, 0, TotalContacts);
+        Emit();
+    }
+
+    public void CompleteContact()
+    {
+        CompletedContacts = Math.Min(TotalContacts, CompletedContacts + 1);
+        Emit();
+    }
+
+    public void SetNotice(string notice)
+    {
+        Notice = notice;
+        Emit();
+    }
 
     public void SetContext(string accountDisplayName, string conversationDisplayName)
     {
@@ -444,5 +557,16 @@ internal sealed class AnalysisProgressTracker
     }
 
     private void Emit()
-        => _publish(new AnalysisProgressSnapshot(RunId, AccountDisplayName, ConversationDisplayName, StartedAt, _stages.ToArray()));
+        => _publish(new AnalysisProgressSnapshot(
+            RunId,
+            AccountDisplayName,
+            ConversationDisplayName,
+            StartedAt,
+            _stages.ToArray(),
+            RoundTitle,
+            TotalContacts,
+            TotalMessages,
+            CurrentContactIndex,
+            CompletedContacts,
+            Notice));
 }

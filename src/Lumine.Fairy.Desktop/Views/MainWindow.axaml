@@ -343,6 +343,7 @@
                                     <StackPanel>
                                         <TextBlock Text="执行状态" FontWeight="SemiBold" Foreground="#142033"/>
                                         <TextBlock Text="{Binding AnalysisContextText}" Classes="muted" Margin="0,4,0,0"/>
+                                        <TextBlock Text="{Binding AnalysisRoundSummaryText}" Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="3">
                                         <TextBlock Text="{Binding AnalysisOverallStatusText}" Foreground="#1769D1" HorizontalAlignment="Right"/>

@@ -89,6 +89,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private bool _isStartupEnabled;
     [ObservableProperty] private string _startupStatusText = string.Empty;
     [ObservableProperty] private string _analysisContextText = "尚未运行微信分析";
+    [ObservableProperty] private string _analysisRoundSummaryText = "本轮尚未建立";
     [ObservableProperty] private string _analysisCurrentStageText = "等待开始";
     [ObservableProperty] private string _analysisOverallStatusText = "未开始";
     [ObservableProperty] private string _analysisLogText = string.Empty;
@@ -171,7 +172,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         _scheduler = new IncrementalAnalysisScheduler(_wechat, _qwenPaw, _analysis, _notificationService);
         _scheduler.WhitelistLoader = RefreshWechatWhitelistCatalogAsync;
         ApplyWechatAnalysisConfiguration(false);
-        _notificationApi = new NotificationHttpServer(_notificationService, token: NotificationApiToken, analysis: _analysis);
+        _notificationApi = new NotificationHttpServer(_notificationService, token: NotificationApiToken, analysis: _analysis, scheduler: _scheduler);
         _notificationService.NotificationAdded += OnNotificationAdded;
         _todoService.TodoChanged += OnTodoChanged;
         _analysis.ProgressChanged += OnAnalysisProgressChanged;
@@ -552,7 +553,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         try
         {
             await RefreshWechatWhitelistCatalogAsync(CancellationToken.None);
-            await _analysis.AnalyzeLatestAsync(SelectedAgent.Id);
+            await _scheduler.AnalyzeNowAsync();
             await ReloadNotificationsAsync();
             await ReloadTodosAsync();
             StatusMessage = "微信分析完成，已发送本地通知。";
@@ -762,7 +763,13 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
                 || progress.Stages.Any(x => x.Id == "complete" && x.Status == "completed")
                 ? DateTimeOffset.UtcNow
                 : null;
-            AnalysisContextText = $"账号：{progress.AccountDisplayName}  ·  会话：{progress.ConversationDisplayName}";
+            AnalysisContextText = string.IsNullOrWhiteSpace(progress.RoundTitle)
+                ? $"账号：{progress.AccountDisplayName}  ·  会话：{progress.ConversationDisplayName}"
+                : $"{progress.RoundTitle}  ·  账号：{progress.AccountDisplayName}";
+            AnalysisRoundSummaryText = progress.TotalContacts <= 0
+                ? "正在收集本轮新增消息…"
+                : $"本轮共 {progress.TotalContacts} 个联系人、{progress.TotalMessages} 条消息；当前处理第 {progress.CurrentContactIndex}/{progress.TotalContacts} 个联系人：{progress.ConversationDisplayName}（已完成 {progress.CompletedContacts} 个）"
+                  + (string.IsNullOrWhiteSpace(progress.Notice) ? string.Empty : $"；{progress.Notice}");
             AnalysisStages.Clear();
             foreach (var stage in progress.Stages)
                 AnalysisStages.Add(new AnalysisStageItemViewModel(stage));

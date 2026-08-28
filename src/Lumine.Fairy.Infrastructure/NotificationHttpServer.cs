@@ -12,14 +12,16 @@ public sealed class NotificationHttpServer : IAsyncDisposable
     private readonly NotificationService _notifications;
     private readonly string _token;
     private readonly WeChatAnalysisCoordinator? _analysis;
+    private readonly IncrementalAnalysisScheduler? _scheduler;
     private readonly HttpListener _listener = new();
     private CancellationTokenSource? _cts;
 
-    public NotificationHttpServer(NotificationService notifications, int port = 18765, string token = "local-dev-notification-token", WeChatAnalysisCoordinator? analysis = null)
+    public NotificationHttpServer(NotificationService notifications, int port = 18765, string token = "local-dev-notification-token", WeChatAnalysisCoordinator? analysis = null, IncrementalAnalysisScheduler? scheduler = null)
     {
         _notifications = notifications;
         _token = token;
         _analysis = analysis;
+        _scheduler = scheduler;
         Port = port;
         _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
     }
@@ -83,7 +85,9 @@ public sealed class NotificationHttpServer : IAsyncDisposable
                     return;
                 }
                 var analysisRequest = await JsonSerializer.DeserializeAsync<AnalysisTriggerRequest>(context.Request.InputStream, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-                var text = await _analysis.AnalyzeLatestAsync(analysisRequest?.AgentId ?? "default");
+                var text = _scheduler is not null
+                    ? await _scheduler.AnalyzeNowAsync()
+                    : await _analysis.AnalyzeLatestAsync(analysisRequest?.AgentId ?? "default");
                 await WriteAsync(context.Response, 200, new { status = "completed", responseLength = text.Length });
                 return;
             }

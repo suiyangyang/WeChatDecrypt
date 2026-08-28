@@ -163,7 +163,13 @@ public sealed record AnalysisProgressSnapshot(
     string AccountDisplayName,
     string ConversationDisplayName,
     DateTimeOffset StartedAt,
-    IReadOnlyList<AnalysisStageSnapshot> Stages);
+    IReadOnlyList<AnalysisStageSnapshot> Stages,
+    string RoundTitle = "",
+    int TotalContacts = 0,
+    int TotalMessages = 0,
+    int CurrentContactIndex = 0,
+    int CompletedContacts = 0,
+    string Notice = "");
 
 public sealed record WeChatAnalysisRequest(
     string AccountId,

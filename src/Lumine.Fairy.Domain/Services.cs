@@ -28,7 +28,10 @@ public interface IQwenPawClient
     string? Username { get; }
     Task<QwenPawLoginResult> LoginAsync(string baseUrl, string username, string password, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<QwenPawAgent>> GetAgentsAsync(CancellationToken cancellationToken = default);
+    Task CreateSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default);
     Task<QwenPawChatResult> ChatAsync(string agentId, string input, CancellationToken cancellationToken = default);
+    Task<QwenPawChatResult> ChatAsync(string agentId, string input, string? sessionId, CancellationToken cancellationToken = default);
+    Task RenameSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default);
 }
 
 public interface IWeChatService

@@ -4,6 +4,9 @@ namespace Lumine.Fairy.Application;
 
 public static class WeChatAnalysisSelection
 {
+    public const int UnanalyzedMessageReadLimit = 200;
+    public const int DefaultMessageReadLimit = 50;
+
     public static bool IsSessionAllowed(
         ChatSession session,
         WeChatAnalysisSettings settings,
@@ -52,15 +55,6 @@ public static class WeChatAnalysisSelection
     {
         if (messages.Count == 0) return [];
 
-        if (mode == WeChatAutomaticAnalysisMode.Unanalyzed)
-        {
-            if (string.IsNullOrWhiteSpace(previousCursor)) return [];
-            var separator = previousCursor.LastIndexOf(':');
-            var previousId = separator > 0 ? previousCursor[..separator] : previousCursor;
-            var previousIndex = messages.ToList().FindIndex(x => x.Id == previousId);
-            return previousIndex >= 0 ? messages.Skip(previousIndex + 1).ToList() : messages;
-        }
-
         var threshold = mode switch
         {
             WeChatAutomaticAnalysisMode.CurrentWeek => StartOfCurrentWeekUtc(),
@@ -68,13 +62,50 @@ public static class WeChatAnalysisSelection
             _ => DateTimeOffset.MinValue,
         };
 
-        return messages
+        var eligible = messages
             .Where(message => ToDateTimeOffset(message.Timestamp) >= threshold)
             .ToList();
+        if (string.IsNullOrWhiteSpace(previousCursor))
+            return mode == WeChatAutomaticAnalysisMode.Unanalyzed ? [] : eligible;
+
+        var previousIndex = FindCursorIndex(messages, previousCursor);
+        if (previousIndex >= 0)
+            return messages
+                .Select((message, index) => (message, index))
+                .Where(item => item.index > previousIndex && ToDateTimeOffset(item.message.Timestamp) >= threshold)
+                .Select(item => item.message)
+                .ToList();
+
+        // The API window is bounded. When the exact cursor has fallen out of
+        // that window, its timestamp is the only safe boundary available.
+        // This intentionally processes only the returned window; older excess
+        // messages are not backfilled in Unanalyzed mode.
+        var previousTimestamp = GetCursorTimestamp(previousCursor);
+        return previousTimestamp is null
+            ? []
+            : eligible.Where(message => ToDateTimeOffset(message.Timestamp) > previousTimestamp.Value).ToList();
     }
 
     public static string GetCursor(ChatMessage message)
         => $"{message.Id}:{message.Timestamp}";
+
+    public static bool HasCursor(IReadOnlyList<ChatMessage> messages, string? cursor)
+        => FindCursorIndex(messages, cursor) >= 0;
+
+    private static int FindCursorIndex(IReadOnlyList<ChatMessage> messages, string? cursor)
+    {
+        if (string.IsNullOrWhiteSpace(cursor)) return -1;
+        var separator = cursor.LastIndexOf(':');
+        var previousId = separator > 0 ? cursor[..separator] : cursor;
+        return messages.ToList().FindIndex(x => x.Id == previousId);
+    }
+
+    private static DateTimeOffset? GetCursorTimestamp(string cursor)
+    {
+        var separator = cursor.LastIndexOf(':');
+        if (separator < 0 || !long.TryParse(cursor[(separator + 1)..], out var timestamp)) return null;
+        return ToDateTimeOffset(timestamp);
+    }
 
     private static DateTimeOffset StartOfCurrentWeekUtc()
     {

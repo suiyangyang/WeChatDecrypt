@@ -99,6 +99,27 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         }
     }
 
+    public async Task<string> AnalyzeNowAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_qwenPaw.IsAuthenticated) throw new InvalidOperationException("尚未登录 QwenPaw。");
+        if (WhitelistLoader is not null)
+            Whitelist = await WhitelistLoader(cancellationToken);
+
+        var accounts = await _weChat.GetAccountsAsync(cancellationToken);
+        await _cursorOperationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var workItems = await CollectWorkItemsAsync(accounts, cancellationToken);
+            if (workItems.Count == 0)
+                throw new InvalidOperationException("匹配的微信会话没有可分析的新消息。");
+            return await AnalyzeWorkItemsAsync(workItems, cancellationToken);
+        }
+        finally
+        {
+            _cursorOperationGate.Release();
+        }
+    }
+
     private async Task RunAsync(CancellationToken cancellationToken)
     {
         while (true)
@@ -110,33 +131,7 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
                 if (WhitelistLoader is not null)
                     Whitelist = await WhitelistLoader(cancellationToken);
                 var accounts = await _weChat.GetAccountsAsync(cancellationToken);
-                foreach (var account in accounts)
-                {
-                    var sessions = await _weChat.GetSessionsAsync(account.Id, cancellationToken);
-                    foreach (var session in sessions)
-                    {
-                        try
-                        {
-                            await ProcessSessionAsync(account, session, cancellationToken);
-                        }
-                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            await _notifications.PublishAsync(new Lumine.Fairy.Protocol.NotificationRequest(
-                                "微信增量分析失败",
-                                ex.Message,
-                                "wechat-analysis",
-                                "wechat",
-                                "warning",
-                                "timeout",
-                                8,
-                                $"analysis-error:{account.Id}:{session.Username}:{DateTimeOffset.UtcNow:yyyyMMddHHmm}"), cancellationToken);
-                        }
-                    }
-                }
+                await ProcessRoundAsync(accounts, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (Exception ex)
@@ -151,12 +146,14 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
     private static TimeSpan GetConfiguredInterval(WeChatAnalysisSettings settings)
         => TimeSpan.FromMinutes(WeChatAnalysisSettings.NormalizeAnalysisIntervalMinutes(settings.AnalysisIntervalMinutes));
 
-    private async Task ProcessSessionAsync(ChatAccount account, ChatSession session, CancellationToken cancellationToken)
+    private async Task ProcessRoundAsync(IReadOnlyList<ChatAccount> accounts, CancellationToken cancellationToken)
     {
         await _cursorOperationGate.WaitAsync(cancellationToken);
         try
         {
-            await ProcessSessionCoreAsync(account, session, cancellationToken);
+            var workItems = await CollectWorkItemsAsync(accounts, cancellationToken);
+            if (workItems.Count > 0)
+                await AnalyzeWorkItemsAsync(workItems, cancellationToken);
         }
         finally
         {
@@ -164,29 +161,62 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         }
     }
 
-    private async Task ProcessSessionCoreAsync(ChatAccount account, ChatSession session, CancellationToken cancellationToken)
-    {
-        if (!WeChatAnalysisSelection.IsSessionAllowed(session, Settings, Whitelist)) return;
+    private async Task<string> AnalyzeWorkItemsAsync(IReadOnlyList<WeChatAnalysisWorkItem> workItems, CancellationToken cancellationToken)
+        => await _coordinator.AnalyzeIncrementalRoundAsync(
+            workItems,
+            AgentId,
+            item =>
+            {
+                if (!string.IsNullOrWhiteSpace(item.CursorKey) && !string.IsNullOrWhiteSpace(item.Cursor))
+                    SaveCursor(item.CursorKey, item.Cursor);
+                return Task.CompletedTask;
+            },
+            cancellationToken);
 
-        var messages = await _weChat.GetLatestMessagesAsync(account.Id, session.Username, 50, cancellationToken);
+    private async Task<IReadOnlyList<WeChatAnalysisWorkItem>> CollectWorkItemsAsync(
+        IReadOnlyList<ChatAccount> accounts,
+        CancellationToken cancellationToken)
+    {
+        var workItems = new List<WeChatAnalysisWorkItem>();
+        foreach (var account in accounts)
+        {
+            var sessions = await _weChat.GetSessionsAsync(account.Id, cancellationToken);
+            foreach (var session in sessions)
+            {
+                var workItem = await PrepareSessionAsync(account, session, cancellationToken);
+                if (workItem is not null)
+                    workItems.Add(workItem);
+            }
+        }
+        return workItems;
+    }
+
+    private async Task<WeChatAnalysisWorkItem?> PrepareSessionAsync(ChatAccount account, ChatSession session, CancellationToken cancellationToken)
+    {
+        if (!WeChatAnalysisSelection.IsSessionAllowed(session, Settings, Whitelist)) return null;
+
+        var readLimit = Settings.AutomaticMode == WeChatAutomaticAnalysisMode.Unanalyzed
+            ? WeChatAnalysisSelection.UnanalyzedMessageReadLimit
+            : WeChatAnalysisSelection.DefaultMessageReadLimit;
+        var messages = await _weChat.GetLatestMessagesAsync(account.Id, session.Username, readLimit, cancellationToken);
         var latest = messages.LastOrDefault();
-        if (latest is null) return;
+        if (latest is null) return null;
 
         var cursorKey = $"{account.Id}:{session.Username}";
         var cursor = WeChatAnalysisSelection.GetCursor(latest);
         string? previous;
         lock (_cursorGate)
             _cursors.TryGetValue(cursorKey, out previous);
+
         var newMessages = WeChatAnalysisSelection.SelectMessages(messages, Settings.AutomaticMode, previous);
         if (newMessages.Count == 0)
         {
             if (Settings.AutomaticMode == WeChatAutomaticAnalysisMode.Unanalyzed && previous is null)
                 SaveCursor(cursorKey, cursor);
-            return;
+            return null;
         }
 
-        await _coordinator.AnalyzeMessagesAsync(account, session, newMessages, AgentId, cancellationToken);
-        SaveCursor(cursorKey, cursor);
+        return new WeChatAnalysisWorkItem(account, session, newMessages, cursorKey, cursor);
     }
 
     private void SaveCursor(string cursorKey, string cursor)

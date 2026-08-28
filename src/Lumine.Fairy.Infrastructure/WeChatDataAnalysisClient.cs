@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Lumine.Fairy.Domain;
 using Lumine.Fairy.Protocol;
@@ -176,10 +178,12 @@ public sealed class WeChatDataAnalysisClient : IWeChatService, IDisposable
         await EnsureBackendAsync(cancellationToken);
         var a = Uri.EscapeDataString(accountId);
         var c = Uri.EscapeDataString(conversationId);
-        using var document = await GetJsonAsync($"/api/chat/messages?account={a}&username={c}&limit={Math.Clamp(limit, 1, 50)}&order=desc&source=realtime", cancellationToken);
+        var effectiveLimit = Math.Clamp(limit, 1, 200);
+        using var document = await GetJsonAsync($"/api/chat/messages?account={a}&username={c}&limit={effectiveLimit}&order=desc&source=realtime", cancellationToken);
         var result = new List<ChatMessage>();
+        var fallbackOrdinals = new Dictionary<string, int>(StringComparer.Ordinal);
         if (!document.RootElement.TryGetProperty("messages", out var messages)) return result;
-        foreach (var item in messages.EnumerateArray())
+        foreach (var item in messages.EnumerateArray().Take(effectiveLimit))
         {
             var content = GetString(item, "messageContent") ?? GetString(item, "message_content") ?? GetString(item, "content") ?? string.Empty;
             var senderDisplayName = GetString(item, "senderDisplayName")
@@ -192,11 +196,80 @@ public sealed class WeChatDataAnalysisClient : IWeChatService, IDisposable
                                  ?? GetString(item, "username");
             var isSent = item.TryGetProperty("isSent", out var sent) && sent.ValueKind == JsonValueKind.True;
             var sender = BuildSenderLabel(senderDisplayName, senderUsername, isSent);
-            var id = GetString(item, "serverId") ?? GetString(item, "server_id") ?? GetString(item, "localId") ?? GetString(item, "local_id") ?? Guid.NewGuid().ToString("N");
-            result.Add(new ChatMessage(id, sender, content, GetLong(item, "createTime") ?? GetLong(item, "create_time") ?? 0));
+            var senderIdentity = !string.IsNullOrWhiteSpace(senderUsername) ? senderUsername.Trim()
+                : !string.IsNullOrWhiteSpace(senderDisplayName) ? senderDisplayName.Trim()
+                : isSent ? "我" : sender;
+            var timestamp = GetLong(item, "createTime") ?? GetLong(item, "create_time") ?? 0;
+            var id = GetMessageId(item);
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                var fingerprint = $"{timestamp}\u001f{senderIdentity}\u001f{content}";
+                var ordinal = fallbackOrdinals.TryGetValue(fingerprint, out var previousOrdinal)
+                    ? previousOrdinal
+                    : 0;
+                fallbackOrdinals[fingerprint] = ordinal + 1;
+                id = BuildStableFallbackMessageId(accountId, conversationId, senderIdentity, content, timestamp, ordinal);
+            }
+
+            result.Add(new ChatMessage(id, sender, content, timestamp));
         }
         result.Reverse();
         return result;
+    }
+
+    internal static string BuildStableFallbackMessageId(
+        string accountId,
+        string conversationId,
+        string sender,
+        string content,
+        long timestamp,
+        int ordinal)
+    {
+        var input = string.Join('\u001f',
+            accountId.Trim(),
+            conversationId.Trim(),
+            timestamp.ToString(CultureInfo.InvariantCulture),
+            sender.Trim(),
+            content,
+            ordinal.ToString(CultureInfo.InvariantCulture));
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(input));
+        return $"fallback-{Convert.ToHexString(hash).ToLowerInvariant()}";
+    }
+
+    private static string? GetMessageId(JsonElement item)
+    {
+        foreach (var property in new[]
+        {
+            "serverId", "server_id", "messageServerId", "message_server_id", "messageId", "message_id",
+            "msgSvrId", "msg_svr_id", "svrId", "svr_id", "serverIdStr"
+        })
+        {
+            var value = GetIdentifier(item, property);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+
+        foreach (var property in new[]
+        {
+            "localId", "local_id", "messageLocalId", "message_local_id", "msgLocalId", "msg_local_id",
+            "msgId", "msg_id"
+        })
+        {
+            var value = GetIdentifier(item, property);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+
+        return null;
+    }
+
+    private static string? GetIdentifier(JsonElement item, string property)
+    {
+        if (!item.TryGetProperty(property, out var value)) return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()?.Trim(),
+            JsonValueKind.Number => value.ToString(),
+            _ => null,
+        };
     }
 
     private static string BuildSenderLabel(string? displayName, string? username, bool isSent)

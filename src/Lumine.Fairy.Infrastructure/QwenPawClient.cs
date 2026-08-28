@@ -10,7 +10,10 @@ namespace Lumine.Fairy.Infrastructure;
 
 public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawClient, IDisposable
 {
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(3) };
+    private static readonly TimeSpan InitialResponseTimeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan StreamIdleTimeout = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan TotalChatTimeout = TimeSpan.FromMinutes(10);
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromMinutes(11) };
     private readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
     private string? _token;
     private string _baseUrl = string.Empty;
@@ -60,13 +63,44 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
         return result;
     }
 
-    public async Task<QwenPawChatResult> ChatAsync(string agentId, string input, CancellationToken cancellationToken = default)
+    public async Task CreateSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
+        if (string.IsNullOrWhiteSpace(sessionId)) throw new ArgumentException("QwenPaw 会话 ID 不能为空。", nameof(sessionId));
+        if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("QwenPaw 会话标题不能为空。", nameof(title));
+
+        using var request = CreateRequest(HttpMethod.Post, "api/chats");
+        request.Content = new StringContent(JsonSerializer.Serialize(new
+        {
+            session_id = sessionId,
+            user_id = "default",
+            channel = "console",
+            name = title,
+        }, _json), Encoding.UTF8, "application/json");
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"创建 QwenPaw 分析会话失败（HTTP {(int)response.StatusCode}）。");
+    }
+
+    public async Task<QwenPawChatResult> ChatAsync(string agentId, string input, CancellationToken cancellationToken = default)
+        => await ChatAsync(agentId, input, null, cancellationToken);
+
+    public async Task<QwenPawChatResult> ChatAsync(string agentId, string input, string? sessionId, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        sessionId = string.IsNullOrWhiteSpace(sessionId) ? $"lumine-fairy-{Guid.NewGuid():N}" : sessionId;
+
+        using var totalTimeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        totalTimeoutSource.CancelAfter(TotalChatTimeout);
+
         using var request = CreateRequest(HttpMethod.Post, "api/console/chat");
         request.Headers.Add("X-Agent-Id", agentId);
         var payload = new
         {
+            session_id = sessionId,
+            user_id = "default",
+            channel = "console",
+            stream = true,
             input = new[]
             {
                 new
@@ -77,16 +111,71 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
             },
         };
         request.Content = new StringContent(JsonSerializer.Serialize(payload, _json), Encoding.UTF8, "application/json");
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        using var initialResponseTimeoutSource = CancellationTokenSource.CreateLinkedTokenSource(totalTimeoutSource.Token);
+        initialResponseTimeoutSource.CancelAfter(InitialResponseTimeout);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, initialResponseTimeoutSource.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                 && !totalTimeoutSource.IsCancellationRequested
+                                                 && initialResponseTimeoutSource.IsCancellationRequested)
+        {
+            throw new TimeoutException("QwenPaw 在 120 秒内没有返回首个响应。");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                 && totalTimeoutSource.IsCancellationRequested)
+        {
+            throw new TimeoutException("QwenPaw 单次分析超过 10 分钟。");
+        }
+
+        using (response)
+        {
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"QwenPaw 对话失败（HTTP {(int)response.StatusCode}）。");
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var reader = new StreamReader(stream);
-        var partialText = new StringBuilder();
-        string? finalText = null;
-        string? sessionId = null;
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        Stream stream;
+        try
         {
+            stream = await response.Content.ReadAsStreamAsync(totalTimeoutSource.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                 && totalTimeoutSource.IsCancellationRequested)
+        {
+            throw new TimeoutException("QwenPaw 单次分析超过 10 分钟。");
+        }
+        await using var responseStream = stream;
+        using var reader = new StreamReader(responseStream);
+        var assistantText = new StringBuilder();
+        string? responseSessionId = null;
+        var assistantMessageIds = new HashSet<string>(StringComparer.Ordinal);
+        var hasStreamActivity = false;
+        var hasFirstContent = false;
+        var hasCompletedResponse = false;
+        using var streamIdleTimeoutSource = CancellationTokenSource.CreateLinkedTokenSource(totalTimeoutSource.Token);
+        streamIdleTimeoutSource.CancelAfter(InitialResponseTimeout);
+        while (true)
+        {
+            string? line;
+            try
+            {
+                line = await reader.ReadLineAsync(streamIdleTimeoutSource.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                     && totalTimeoutSource.IsCancellationRequested)
+            {
+                throw new TimeoutException("QwenPaw 单次分析超过 10 分钟。");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                                                     && streamIdleTimeoutSource.IsCancellationRequested)
+            {
+                throw new TimeoutException(hasFirstContent
+                    ? "QwenPaw 流式响应连续 60 秒没有新数据。"
+                    : "QwenPaw 在 120 秒内没有返回首个有效内容。\n");
+            }
+
+            if (line is null) break;
             if (!line.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
             var json = line[5..].Trim();
             if (string.IsNullOrWhiteSpace(json)) continue;
@@ -94,12 +183,50 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
             {
                 using var document = JsonDocument.Parse(json);
                 var root = document.RootElement;
-                sessionId ??= GetString(root, "session_id");
+                responseSessionId ??= GetString(root, "session_id");
                 var objectName = GetString(root, "object");
                 var status = GetString(root, "status");
-                var extracted = ExtractText(root);
-                if (objectName == "content" && !string.IsNullOrEmpty(extracted)) partialText.Append(extracted);
-                if (objectName == "response" && status == "completed") finalText = extracted;
+                var isResponseActivity = !string.Equals(objectName, "response", StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase);
+                if (isResponseActivity)
+                {
+                    hasStreamActivity = true;
+                    streamIdleTimeoutSource.CancelAfter(hasFirstContent ? StreamIdleTimeout : InitialResponseTimeout);
+                }
+
+                if (string.Equals(objectName, "message", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(objectName, "content", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasFirstContent = true;
+                    streamIdleTimeoutSource.CancelAfter(StreamIdleTimeout);
+                }
+
+                if (objectName == "message"
+                    && string.Equals(GetString(root, "type"), "message", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(GetString(root, "role"), "assistant", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(GetString(root, "id")))
+                {
+                    assistantMessageIds.Add(GetString(root, "id")!);
+                }
+
+                if (objectName == "content"
+                    && assistantMessageIds.Contains(GetString(root, "msg_id") ?? string.Empty))
+                {
+                    assistantText.Append(GetString(root, "text"));
+                }
+
+                if (objectName == "response" && status == "completed")
+                {
+                    hasCompletedResponse = true;
+                    var finalText = ExtractFinalAssistantText(root);
+                    if (!string.IsNullOrWhiteSpace(finalText))
+                    {
+                        hasFirstContent = true;
+                        assistantText.Clear();
+                        assistantText.Append(finalText);
+                    }
+                    break;
+                }
             }
             catch (JsonException)
             {
@@ -107,8 +234,44 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
             }
         }
 
-        var text = string.IsNullOrWhiteSpace(finalText) ? partialText.ToString() : finalText;
-        return new QwenPawChatResult(text.Trim(), sessionId, TryParseAnalysis(text));
+        if (!hasStreamActivity || !hasFirstContent)
+            throw new TimeoutException("QwenPaw 在 120 秒内没有返回首个有效内容。");
+        if (!hasCompletedResponse)
+            throw new InvalidOperationException("QwenPaw 流式响应提前结束，未收到 completed 事件。");
+
+        var text = assistantText.ToString().Trim();
+        return new QwenPawChatResult(text, responseSessionId ?? sessionId, TryParseAnalysis(text));
+        }
+    }
+
+    public async Task RenameSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        if (string.IsNullOrWhiteSpace(sessionId)) throw new ArgumentException("QwenPaw 会话 ID 不能为空。", nameof(sessionId));
+        if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("QwenPaw 会话标题不能为空。", nameof(title));
+
+        using var listRequest = CreateRequest(HttpMethod.Get, "api/chats");
+        using var listResponse = await _http.SendAsync(listRequest, cancellationToken);
+        var listRaw = await listResponse.Content.ReadAsStringAsync(cancellationToken);
+        if (!listResponse.IsSuccessStatusCode)
+            throw new InvalidOperationException($"读取 QwenPaw 会话失败（HTTP {(int)listResponse.StatusCode}）。");
+
+        using var document = JsonDocument.Parse(listRaw);
+        var chatId = document.RootElement.ValueKind == JsonValueKind.Array
+            ? document.RootElement.EnumerateArray()
+                .Where(item => string.Equals(GetString(item, "id"), sessionId, StringComparison.Ordinal)
+                               || string.Equals(GetString(item, "session_id"), sessionId, StringComparison.Ordinal))
+                .Select(item => GetString(item, "id"))
+                .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id))
+            : null;
+        if (string.IsNullOrWhiteSpace(chatId))
+            throw new InvalidOperationException("QwenPaw 未找到待命名的分析会话。");
+
+        using var updateRequest = CreateRequest(HttpMethod.Put, $"api/chats/{Uri.EscapeDataString(chatId)}");
+        updateRequest.Content = new StringContent(JsonSerializer.Serialize(new { name = title }, _json), Encoding.UTF8, "application/json");
+        using var updateResponse = await _http.SendAsync(updateRequest, cancellationToken);
+        if (!updateResponse.IsSuccessStatusCode)
+            throw new InvalidOperationException($"更新 QwenPaw 会话标题失败（HTTP {(int)updateResponse.StatusCode}）。");
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativePath)
@@ -134,6 +297,24 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
         return string.Concat(parts);
     }
 
+    private static string ExtractFinalAssistantText(JsonElement response)
+    {
+        if (!response.TryGetProperty("output", out var output) || output.ValueKind != JsonValueKind.Array)
+            return string.Empty;
+
+        var finalText = string.Empty;
+        foreach (var item in output.EnumerateArray())
+        {
+            if (!string.Equals(GetString(item, "type"), "message", StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(GetString(item, "role"), "assistant", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            finalText = ExtractText(item);
+        }
+
+        return finalText;
+    }
+
     private static void CollectText(JsonElement element, List<string> parts)
     {
         if (element.ValueKind == JsonValueKind.Object)
@@ -152,19 +333,64 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
         }
     }
 
-    private static AnalysisResult? TryParseAnalysis(string text)
+    internal static AnalysisResult? TryParseAnalysis(string text)
     {
-        var start = text.IndexOf('{');
-        var end = text.LastIndexOf('}');
-        if (start < 0 || end <= start) return null;
-        try
+        for (var start = 0; start < text.Length; start++)
         {
-            return JsonSerializer.Deserialize<AnalysisResult>(text[start..(end + 1)], new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            if (text[start] != '{') continue;
+
+            var end = FindBalancedJsonEnd(text, start);
+            if (end < 0) continue;
+
+            try
+            {
+                var analysis = JsonSerializer.Deserialize<AnalysisResult>(
+                    text[start..(end + 1)],
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (analysis is not null
+                    && !string.IsNullOrWhiteSpace(analysis.Decision)
+                    && analysis.Todos is not null
+                    && analysis.Intents is not null
+                    && analysis.Questions is not null
+                    && analysis.SourceRefs is not null)
+                    return analysis;
+            }
+            catch (JsonException)
+            {
+                // Try the next balanced JSON object. Reasoning or markdown may contain other braces.
+            }
         }
-        catch (JsonException)
+
+        return null;
+    }
+
+    private static int FindBalancedJsonEnd(string text, int start)
+    {
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+        for (var index = start; index < text.Length; index++)
         {
-            return null;
+            var character = text[index];
+            if (inString)
+            {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') inString = false;
+                continue;
+            }
+
+            if (character == '"')
+            {
+                inString = true;
+                continue;
+            }
+
+            if (character == '{') depth++;
+            else if (character == '}' && --depth == 0) return index;
         }
+
+        return -1;
     }
 
     public void Dispose() => _http.Dispose();
