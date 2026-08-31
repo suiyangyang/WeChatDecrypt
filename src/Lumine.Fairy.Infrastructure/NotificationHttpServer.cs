@@ -11,23 +11,34 @@ public sealed class NotificationHttpServer : IAsyncDisposable
 {
     private readonly NotificationService _notifications;
     private readonly string _token;
+    private readonly string _bindAddress;
+    private readonly string _advertisedHost;
     private readonly WeChatAnalysisCoordinator? _analysis;
     private readonly IncrementalAnalysisScheduler? _scheduler;
     private readonly HttpListener _listener = new();
     private CancellationTokenSource? _cts;
 
-    public NotificationHttpServer(NotificationService notifications, int port = 18765, string token = "local-dev-notification-token", WeChatAnalysisCoordinator? analysis = null, IncrementalAnalysisScheduler? scheduler = null)
+    public NotificationHttpServer(
+        NotificationService notifications,
+        int port = 18765,
+        string token = "local-dev-notification-token",
+        WeChatAnalysisCoordinator? analysis = null,
+        IncrementalAnalysisScheduler? scheduler = null,
+        string? bindAddress = null)
     {
         _notifications = notifications;
         _token = token;
+        _bindAddress = NormalizeBindAddress(bindAddress);
+        _advertisedHost = ResolveAdvertisedHost(_bindAddress);
         _analysis = analysis;
         _scheduler = scheduler;
         Port = port;
-        _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        _listener.Prefixes.Add($"http://{_bindAddress}:{port}/");
     }
 
     public int Port { get; }
-    public string Endpoint => $"http://127.0.0.1:{Port}/api/v1/notifications";
+    public string BindAddress => _bindAddress;
+    public string Endpoint => $"http://{_advertisedHost}:{Port}/api/v1/notifications";
     public bool IsRunning => _listener.IsListening;
 
     public Task StartAsync(CancellationToken cancellationToken = default)
@@ -67,9 +78,11 @@ public sealed class NotificationHttpServer : IAsyncDisposable
             if (context.Request.HttpMethod == "POST" && path.Equals("/api/v1/notifications", StringComparison.OrdinalIgnoreCase))
             {
                 var request = await JsonSerializer.DeserializeAsync<NotificationRequest>(context.Request.InputStream, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-                if (request is null || string.IsNullOrWhiteSpace(request.Title))
+                if (request is null
+                    || string.IsNullOrWhiteSpace(request.Title)
+                    || request.Body is null)
                 {
-                    await WriteAsync(context.Response, 400, new { error = "title is required" });
+                    await WriteAsync(context.Response, 400, new { error = "title and body are required" });
                     return;
                 }
                 var notification = await _notifications.PublishAsync(request);
@@ -166,6 +179,41 @@ public sealed class NotificationHttpServer : IAsyncDisposable
     {
         var header = request.Headers["Authorization"] ?? string.Empty;
         return header.Equals($"Bearer {_token}", StringComparison.Ordinal);
+    }
+
+    private static string NormalizeBindAddress(string? bindAddress)
+    {
+        var value = string.IsNullOrWhiteSpace(bindAddress) ? "+" : bindAddress.Trim();
+        if (value is "*" or "+" or "0.0.0.0") return "+";
+
+        if (IPAddress.TryParse(value, out var address))
+        {
+            if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+                throw new ArgumentException("通知接口当前只支持 IPv4 绑定地址。", nameof(bindAddress));
+            return address.ToString();
+        }
+
+        if (Uri.CheckHostName(value) is UriHostNameType.Dns or UriHostNameType.Basic)
+            return value;
+
+        throw new ArgumentException("通知接口绑定地址无效。", nameof(bindAddress));
+    }
+
+    private static string ResolveAdvertisedHost(string bindAddress)
+    {
+        if (!string.Equals(bindAddress, "+", StringComparison.Ordinal)) return bindAddress;
+
+        try
+        {
+            var address = Dns.GetHostEntry(Dns.GetHostName()).AddressList
+                .FirstOrDefault(item => item.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork
+                                        && !IPAddress.IsLoopback(item));
+            return address?.ToString() ?? "127.0.0.1";
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            return "127.0.0.1";
+        }
     }
 
     private static async Task WriteAsync(HttpListenerResponse response, int statusCode, object value)

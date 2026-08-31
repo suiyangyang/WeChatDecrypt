@@ -69,6 +69,12 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
 
     public async Task<NotificationRecord> AddAsync(NotificationRequest request, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.Title))
+            throw new ArgumentException("Notification title is required.", nameof(request));
+        var body = request.Body;
+        ArgumentNullException.ThrowIfNull(body, nameof(request.Body));
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -88,7 +94,7 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
             var record = new NotificationRecord(
                 Guid.NewGuid().ToString("N"),
                 request.Title.Trim(),
-                request.Body.Trim(),
+                body.Trim(),
                 string.IsNullOrWhiteSpace(request.Source) ? "local" : request.Source.Trim(),
                 string.IsNullOrWhiteSpace(request.Category) ? "other" : request.Category.Trim(),
                 string.IsNullOrWhiteSpace(request.Severity) ? "info" : request.Severity.Trim(),
