@@ -11,7 +11,7 @@ WeChatDataAnalysisRelease
         v
 QwenPaw Agent 返回 AnalysisResult JSON
         |
-        +--> TODO 候选写入 todos.db，状态 pending_confirmation
+        +--> TODO 候选写入 todos.db，状态 pending_confirmation，归入“待确认”列表
         |       |
         |       v
         |   通知中心显示“确认加入 TODO / 忽略”
@@ -23,7 +23,7 @@ QwenPaw Agent 返回 AnalysisResult JSON
         +--> Question 生成带解决方案的确认通知
 ```
 
-如果消息来自已在联系人管理中标注公司的微信群聊，TODO 候选、通知和工作页会显示公司名称。归属匹配键为 `accountId + conversationId`，不会根据群名或聊天内容自动猜测公司。
+如果消息来自已在联系人管理中标注公司的微信联系人或群聊，TODO 候选、通知和工作页会显示公司名称。归属匹配键为 `accountId + conversationId`。联系人管理“微信联系人”页提供“自动分配公司”操作，按联系人或群聊名称中的公司中文名或完整拼音序列严格匹配，仅为活跃且尚未分配的条目写入公司归属；分析流程本身不会根据联系人名称或聊天内容隐式修改归属。
 
 ## 消息读取
 
@@ -40,7 +40,7 @@ QwenPaw Agent 返回 AnalysisResult JSON
 
 ## TODO 生命周期
 
-`Lumine.Fairy.Infrastructure.SqliteTodoStore` 使用 `%LOCALAPPDATA%/Lumine.Fairy/todos.db` 保存 TODO，并保存可选的公司 ID、公司名称、会话显示名称和群聊标记。
+`Lumine.Fairy.Infrastructure.SqliteTodoStore` 使用 `%LOCALAPPDATA%/Lumine.Fairy/todos.db` 保存 TODO，并保存可选的公司 ID、公司名称、会话显示名称和群聊标记。看板数据使用 `todo_boards`、`todo_lists` 和 `todos` 的布局字段保存；卡片的标签、颜色、Checklist 和评论以 JSON 保存在卡片记录中。
 
 状态如下：
 
@@ -49,6 +49,8 @@ QwenPaw Agent 返回 AnalysisResult JSON
 - `in_progress`：预留给后续执行状态；
 - `completed`：预留给后续完成操作；
 - `rejected`：用户忽略，不在工作页显示。
+
+看板默认创建一个工作看板和“待确认”“待办”“进行中”“已完成”四个系统列表。微信分析产生的新工作内容进入“待确认”列表；用户确认后自动转入“待办”列表。用户可以创建、重命名、删除和归档自定义列表；系统列表不能删除或归档，“待确认”列表另外不能修改名称。列表拖动由存储层事务调整 `todo_lists.position`，卡片保存 `board_id`、`list_id`、`position` 和 `is_archived`，移动卡片时由存储层事务调整源列表和目标列表的位置，确保重启后顺序一致。删除列表会在同一事务中删除列表及其卡片。工作页提供搜索、状态筛选、公司筛选和手动顺序、优先级、截止时间、创建时间排序，默认使用手动顺序；卡片支持编辑详情、归档/恢复和确认后永久删除；已归档卡片通过“已归档”筛选查看，并可在详情中恢复。所属公司来自联系人管理中的启用公司列表，编辑卡片时同步保存公司 ID 和名称。
 
 候选 TODO 使用账号、会话、消息引用和候选内容生成稳定哈希标识，避免模型重复使用简单序号时误合并不同事项。候选写入成功但通知写入失败时，下一次分析会补发缺失通知。
 
@@ -59,7 +61,7 @@ QwenPaw Agent 返回 AnalysisResult JSON
 - TODO 候选通知使用 `confirm-todo` 和 `reject-todo` 两个动作。
 - 澄清问题通知使用 `question-solution` 动作，选择方案后继续调用 QwenPaw。
 - 通知 payload 和 question 数据均持久化在通知 SQLite 中，应用重启后仍可处理未完成确认。
-- 工作页只读取 TODO 数据库，不再使用静态示例数据。
+- 工作页从 TODO 数据库读取工作内容，并将内容按状态、公司筛选、搜索和按手动顺序/优先级/截止时间/创建时间排序；`pending_confirmation` 候选显示在“待确认”列表中，同时保留工作通知中的确认操作。仅在手动顺序且未筛选时，TODO 卡片可拖拽移动列表和位置，目标列表的整个面板均为卡片接收区域，列表可通过左侧手柄拖拽排序，卡片右上角的更多菜单可编辑标题、摘要、优先级、负责人、截止时间、所属列表、所属公司、标签及标签颜色、Checklist、评论和归档状态，并提供归档/恢复和确认后删除。移动到 `completed` 列表时补写 `completed_at`。工作通知单独位于工作页的 Tab 中，只展示未读普通通知和仍需操作的通知，完整通知历史由通知中心提供。确认 `pending_confirmation` 候选后自动进入 TODO 的“待办”列表。
 
 ## 微信分析实时状态
 

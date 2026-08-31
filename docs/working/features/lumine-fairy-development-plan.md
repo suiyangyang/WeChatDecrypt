@@ -313,7 +313,7 @@ Notification
 
 ### P2-002a 第三方通知 HTTP 接口
 
-第三方程序通过本机回环地址发送通知。当前版本只监听 `127.0.0.1`，不对公网开放；远程 QwenPaw 通知暂不通过远程设备通道实现。
+第三方程序通过 HTTP 接口发送通知。当前版本默认监听 Fairy 所在 Windows 计算机的所有 IPv4 网卡，允许受控的局域网访问；可通过 `LumineFairyNotificationBindAddress` 收窄到指定地址，不对公网开放；远程 QwenPaw 通知暂不通过远程设备通道实现。非回环监听需要配置 Windows URL ACL 和防火墙规则。
 
 接口：
 
@@ -451,9 +451,9 @@ HTTP 状态码：
 认证和限制：
 
 - 使用 `Authorization: Bearer <notification-token>`；
-- Token 只授予“发送通知”权限，默认不能读取历史通知；
-- Token 在 Avalonia 设置页创建、撤销和轮换；
-- 只监听 `127.0.0.1`；
+- Avalonia 设置页显示当前接口实际使用的 Bearer Token，并支持密码样式的显示/隐藏；
+- 当前没有独立权限 scope，本文档列出的通知端点共用同一个 Token；
+- 默认监听所有 IPv4 网卡，也可通过 `LumineFairyNotificationBindAddress` 指定绑定地址；
 - 限制请求频率、正文长度、操作按钮数量和 payload 大小；
 - Token、请求正文和通知 payload 不写入普通日志。
 

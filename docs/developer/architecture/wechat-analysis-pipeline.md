@@ -2,7 +2,7 @@
 
 ## 1. 文档目的
 
-本文记录当前微信分析链路的真实实现，作为开发、排障和后续扩展的基准。微信原始数据库、密钥和聊天正文保留在本机；QwenPaw 只接收经过本地分析流程提交的消息内容。
+本文记录当前微信分析链路的真实实现，作为开发、排障和后续扩展的基准。微信原始数据库、密钥和聊天正文保留在本机；QwenPaw 只接收经过本地分析流程提交的消息内容，以及由本地联系人管理数据解析出的最小业务上下文。
 
 相关细节：
 
@@ -18,8 +18,11 @@
 | `WeChatAnalysisCoordinator` | 编排读取、QwenPaw 分析、结果解析、TODO/通知保存 |
 | `QwenPawClient` | 登录 QwenPaw、读取 Agent、发送对话并解析 SSE 响应 |
 | `IncrementalAnalysisScheduler` | 按微信分析设置的解析间隔检查所有账号和会话的新增消息 |
-| `WeChatGroupChatProvider` | 从本地微信会话接口筛选最近有沟通的群聊，不读取聊天正文 |
-| `WeChatGroupChatDirectoryService` | 将群聊按账号和群聊标识同步到联系人管理，并维护公司归属 |
+| `WeChatGroupChatProvider` | 从本地微信联系人接口同步全部可显示的联系人和群聊，不读取聊天正文 |
+| `WeChatGroupChatDirectoryService` | 将微信联系人和群聊按账号、标识同步到联系人管理，并维护公司归属 |
+| `WeChatAnalysisContextResolver` | 从本地联系人管理快照解析当前会话的联系人、公司、项目和项目标签，不读取聊天正文 |
+| `WeChatContextHttpServer` | 在 Fairy 所在机器提供带 Bearer Token 的只读上下文查询接口，仅返回脱敏后的显示名称和标签 |
+| `tools/lumine-fairy-wechat-context-mcp/server.py` | QwenPaw 侧 stdio MCP 适配器，将有限的会话元数据转发到 Fairy 上下文接口 |
 | `SqliteTodoStore` | 持久化 TODO 候选和 TODO 状态 |
 | `SqliteNotificationStore` | 持久化通知、操作、问题和结构化 payload |
 | Avalonia Desktop | 提供分析按钮、阶段进度、错误、日志和确认操作 |
@@ -78,7 +81,7 @@ GET /api/chat/sessions
 会话显示名称依次使用 `displayName`、`display_name`、`name` 和 `username`。
 会话类型优先使用后端的群聊字段；后端未返回类型时，以 `@@` 开头或以 `@chatroom` 结尾的微信会话标识作为群聊兜底判断。
 
-微信群聊同步会额外调用：
+微信联系人同步会额外调用：
 
 ```text
 GET /api/chat/contacts
@@ -87,9 +90,13 @@ GET /api/chat/contacts
     &source=realtime
 ```
 
-群名优先使用联系人元数据中的 `displayName`、`name`、`nickname`、`remark`，再使用会话名称；如果所有字段仍是微信标识，则显示为“未知群聊”，微信标识保留在“账号 / 标识”列。解析后端返回的 `HH:mm`、`M月d日 HH:mm` 等本地化时间字符串会转换为时间戳后再执行最近沟通筛选。
+联系人或群名优先使用联系人元数据中的 `displayName`、`name`、`nickname`、`remark`，再使用会话名称；如果所有字段仍是微信标识，则按类型显示为“未知联系人”或“未知群聊”。目录同时保存联系人/群聊类型和最近沟通时间；同步不再按最近沟通时间过滤。
 
-主 App 的联系人管理页面调用同一会话接口，按账号和 `username` 去重，并按最近沟通时间筛选。群聊目录只保存元数据和人工维护的 `CompanyId` / `ProjectId`，不保存群聊正文。
+主 App 的联系人管理页面调用同一联系人和会话接口，按账号和 `username` 去重并补充最近沟通时间。微信联系人目录只保存元数据和用户维护的 `CompanyId` / `ProjectId`，不保存聊天正文。
+联系人管理页面可对活跃且尚未分配公司的条目执行“自动分配公司”，匹配器会在联系人或群聊名称中查找公司中文名或完整拼音序列，要求字符/拼音按原顺序连续出现，并按最长命中名称选择结果；已有公司归属不会被覆盖。
+微信联系人管理页在本地对活跃条目提供公司归属和联系人类型两组组合筛选：公司归属支持已分配、未分配和全部，联系人类型支持群聊、联系人和全部类型；筛选后仍可叠加名称、账号或公司关键字搜索。
+微信联系人行模型记录公司归属是否已修改；页面支持逐项保存或通过“全部保存”仅提交当前所有待保存的归属修改，提交成功后重新从 SQLite 构建行模型。
+刷新时以当前联系人和会话目录进行对账：未在本次结果中出现的旧条目标记为非活动并从 UI 隐藏，但保留其公司/项目归属，避免历史映射丢失。
 
 ### 3.4 消息读取
 
@@ -114,13 +121,26 @@ GET /api/chat/messages
 4. 按账号的数据库数量选择分析账号；
 5. 读取最近会话并按联系人管理数据筛选符合白名单的会话；启用白名单时分析全部匹配会话，关闭白名单时保留单次手动分析一个最近会话的行为；
 6. 先读取白名单范围内所有会话的待分析消息，统计本轮有新增消息的联系人数量和消息总数；没有新增消息的会话不提交给 QwenPaw；
-7. 为本轮生成一个 session_id 和“聊天记录分析_yyyyMMdd_HHmm”标题，按联系人顺序逐个提交；每次提交都等待上一次流式响应完成后再继续；
+7. 为本轮生成一个 session_id 和“聊天记录分析_yyyyMMdd_HHmm”标题，按联系人顺序逐个提交；提交前在本机解析当前会话的最小业务上下文；每次提交都等待上一次流式响应完成后再继续；
 8. 通过 SSE 流式等待 QwenPaw 返回结构化分析结果，首个有效内容超时 2 分钟、连续无数据超时 1 分钟、单个联系人总超时 10 分钟；
 9. 校验 `AnalysisResult`；
 10. 仅保存所选的 TODO 候选、客户提问和分析完成通知；
-11. 刷新通知中心和工作页。
+11. 刷新通知中心和工作页；工作页分别展示工作类通知和 TODO（包括待确认候选）。
 
-手动分析和自动分析都会在执行前从共享的联系人管理 SQLite 数据重新构建白名单目录。联系人管理中的微信 ID 使用精确匹配；姓名、昵称、公司、项目和群聊名称只作为备用匹配。联系人、公司和群聊筛选在本地完成，不绕过本地数据边界直接读取数据库。
+手动分析和自动分析都会在执行前从共享的联系人管理 SQLite 数据重新构建白名单目录。联系人管理中的微信 ID 使用精确匹配；姓名、昵称、公司、项目和群聊名称只作为备用匹配。联系人、公司和群聊筛选及分析上下文解析均在本地完成，不绕过本地数据边界直接读取数据库。
+
+### 4.1 QwenPaw 分析上下文
+
+分析前由 `WeChatAnalysisContextResolver` 使用账号 ID、会话 `username` 和会话显示名称查询本地联系人管理快照，按以下优先级解析：
+
+1. 微信会话目录中的账号 + `username` 精确映射；
+2. 联系人维护的微信 ID 精确映射；
+3. 唯一的联系人姓名或昵称匹配；
+4. 唯一的公司、项目名称或项目群聊名称匹配。
+
+解析结果通过 `WeChatContextHttpServer` 和 QwenPaw stdio MCP 适配器，只向 QwenPaw 提供联系人名称、公司名称、项目名称、项目标签和匹配方式，不提供联系人电话、邮箱、备注、关系信息或内部数据库 ID。聊天事实优先于上下文；没有唯一匹配时不猜测。联系人管理数据库、微信原始数据库和聊天正文不会复制到 QwenPaw，也不会由 Skill 直接访问。接口配置和逐级验证步骤见 [微信上下文 MCP 配置](../operations/wechat-context-mcp.md)。
+
+同一份解析结果同时用于提示词和 TODO 公司归属，避免分析上下文与本地落库结果不一致。
 
 ## 5. 增量分析流程
 
@@ -155,13 +175,13 @@ GET /api/chat/messages
 
 白名单、分析内容、自动分析模式和解析间隔由微信分析设置页维护。解析间隔以分钟保存，默认 5 分钟，范围为 1～1440 分钟；调度器每次等待下一轮时读取当前配置。白名单启用后，调度器只处理与选中联系人、公司名称或其别名匹配的联系人和群聊；公司匹配会同时纳入其关联联系人、项目名称和项目群聊。关闭后处理全部会话。提示词只要求 QwenPaw 返回 ToDo 和/或客户提问，客户提问需满足客户 `@我` 且 10 分钟内未得到回复。
 
-联系人管理中的微信 ID 存储在联系人实体中；微信群聊目录随 SQLite schemaVersion 7 一起迁移，JSON / Excel 导入导出也保留群聊归属字段。自动调度器每次轮询前重新加载联系人数据库，联系人管理页面与分析服务在同一主 App 中共享同一数据源；独立宿主修改数据后也会在下一次轮询重新读取。
+联系人管理中的微信 ID 存储在联系人实体中；微信联系人目录随 SQLite schemaVersion 8 一起迁移，并保留联系人/群聊类型，JSON / Excel 导入导出也保留类型和归属字段。自动调度器每次轮询前重新加载联系人数据库，联系人管理页面与分析服务在同一主 App 中共享同一数据源；独立宿主修改数据后也会在下一次轮询重新读取。
 
 调度器使用当前选择的 QwenPaw Agent；用户切换 Agent 后，后续轮询同步使用新 Agent。
 
 ## 6. QwenPaw 分析协议
 
-提示词要求 Agent 返回可解析的 `AnalysisResult` JSON，主要字段如下：
+提示词要求 Agent 返回可解析的 `AnalysisResult` JSON。所有字段名统一使用 `camelCase`，禁止使用 `snake_case`。提示词在聊天内容之前包含本地解析的最小业务上下文，主要字段如下：
 
 ```text
 AnalysisResult
@@ -172,21 +192,50 @@ AnalysisResult
   sourceRefs[]
 ```
 
-TODO 候选至少包含：
+TODO 候选必须完整符合以下结构；无法生成完整工作事项时，`todos` 必须是空数组，不得返回空对象或缺少字段的对象：
 
 ```text
 TodoCandidate
-  id
-  title
-  summary
-  priority
-  dueAt
-  assignee
-  confidence
-  sourceRefs[]
+  id: 非空字符串
+  title: 非空字符串
+  summary: 非空字符串，说明具体工作、聊天上下文和预期结果
+  priority: low | medium | high
+  dueAt: ISO-8601 时间或 null
+  assignee: 非空字符串或 null
+  confidence: 0 至 1
+  sourceRefs: 至少一个非空消息 ID
 ```
 
-QwenPaw 返回通过 SSE 接收。每轮分析使用一个 `session_id`，同一轮内的多个联系人按顺序复用该会话；客户端在提示词中明确当前联系人边界，只提取最终 `response.output` 中 `type=message`、`role=assistant` 的内容，排除 reasoning，并支持 JSON 代码块或附加说明。首个有效 SSE 内容等待 2 分钟，连续 1 分钟没有有效 SSE 活动或单个联系人总时长超过 10 分钟时失败。发送首个联系人消息前，客户端通过 QwenPaw 会话接口预创建并命名“聊天记录分析_yyyyMMdd_HHmm”会话。解析结果必须包含 `decision`、`todos`、`intents`、`questions` 和 `sourceRefs`；没有有效 `AnalysisResult` 时分析失败，不创建完成通知，也不推进增量游标。
+`summary` 必须是一至两句可直接展示在工作卡片上的描述，不能只重复 `title`。解析器拒绝 `summary` 缺失、为空或只包含空白字符的 TODO，避免创建没有描述的工作卡片。
+
+疑问候选必须完整符合以下结构；无法生成完整疑问时，`questions` 必须是空数组，不得返回空对象或缺少字段的对象：
+
+```text
+ClarificationQuestion
+  id: 非空字符串
+  problem: 非空字符串
+  source: QuestionSource
+  solutions: 至少两个 QuestionSolution
+  recommendedSolutionId: 非空字符串，且匹配唯一推荐方案
+  allowCustomInput: boolean
+
+QuestionSource
+  conversationId: 非空字符串
+  participants: 至少一个非空字符串
+  from: 非空字符串
+  to: 非空字符串
+  messageRefs: 至少一个非空消息 ID
+
+QuestionSolution
+  id: 非空字符串
+  label: 非空字符串
+  instruction: 非空字符串
+  recommended: boolean
+```
+
+`solutions` 必须至少包含两个方案，且只能有一个方案的 `recommended` 为 `true`。`recommendedSolutionId` 必须等于该推荐方案的 `id`。`questions` 中的对象不能写成 `{}`，也不能把 `problem`、`source` 或 `solutions` 写成 `null`。
+
+QwenPaw 返回通过 SSE 接收。每轮分析使用一个 `session_id`，同一轮内的多个联系人按顺序复用该会话；客户端在提示词中明确当前联系人边界，只提取最终 `response.output` 中 `type=message`、`role=assistant` 的内容，排除 reasoning，并支持 JSON 代码块或附加说明。首个有效 SSE 内容等待 2 分钟，连续 1 分钟没有有效 SSE 活动或单个联系人总时长超过 10 分钟时失败。发送首个联系人消息前，客户端通过 QwenPaw 会话接口预创建并命名“聊天记录分析_yyyyMMdd_HHmm”会话。解析器会校验顶层字段和 `questions[]` 的嵌套字段；没有有效 `AnalysisResult` 时分析失败，不创建完成通知，也不推进增量游标。
 
 ## 7. 实时阶段状态
 
@@ -239,14 +288,14 @@ TODO 候选写入：
 %LOCALAPPDATA%/Lumine.Fairy/todos.db
 ```
 
-候选先保存为 `pending_confirmation`，并生成通知：
+候选先保存为 `pending_confirmation`，归入默认的“待确认”列表，并生成通知：
 
 ```text
 confirm-todo
 reject-todo
 ```
 
-只有用户确认后才转为 `pending`，进入工作页。TODO 使用账号、会话、消息引用和候选内容生成稳定哈希，避免模型重复使用简单序号导致不同事项被误合并。如果当前会话是已在联系人管理中标注公司的微信群聊，`TodoRecord` 同时保存 `CompanyId`、`CompanyName`、会话显示名称和群聊标记，工作页与 TODO 通知展示公司名称。
+候选在 TODO 看板的“待确认”列表中可见；用户确认后才转为 `pending`，并进入“待办”列表。TODO 使用账号、会话、消息引用和候选内容生成稳定哈希，避免模型重复使用简单序号导致不同事项被误合并。如果当前会话是已在联系人管理中标注公司的微信联系人或群聊，`TodoRecord` 同时保存 `CompanyId`、`CompanyName`、会话显示名称和群聊标记，工作页与 TODO 通知展示公司名称。同一候选再次分析时，只有仍处于待确认状态且摘要为空的微信候选会补齐新的标题和摘要；已确认或已手工填写摘要的事项不会被自动覆盖。
 
 ### 8.2 通知
 

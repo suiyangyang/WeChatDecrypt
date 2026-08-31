@@ -14,6 +14,18 @@
 
 客户端不会仅凭 `/api/health` 判断后端可用，还会检查聊天账号列表和当前数据目录对应的日志位置。
 
+## 第三方通知接口
+
+桌面客户端启动时会自动启动第三方通知 HTTP 接口，默认监听 `http://+:18765/`，即本机所有 IPv4 网卡。设置页显示可供第三方程序访问的实际局域网地址，例如 `http://192.168.1.20:18765/api/v1/notifications`。
+
+如需只绑定某一个局域网地址，可设置用户级环境变量后重启 Fairy：
+
+```powershell
+[Environment]::SetEnvironmentVariable('LumineFairyNotificationBindAddress', '192.168.1.20', 'User')
+```
+
+非回环监听通常需要管理员注册 URL ACL，并在 Windows 防火墙中只放行受信任第三方程序所在的 IP。完整的端点、认证和防火墙配置见[第三方通知 HTTP 接口开发文档](third-party-notification-api.md)。不要为 `18765` 配置公网端口转发。
+
 ## 单实例策略
 
 `Lumine.Fairy.Desktop` 使用全局 Windows 互斥量保证同一用户会话只有一个桌面实例。重复启动时显示提示并退出，用户应从已有实例的系统托盘打开窗口。
