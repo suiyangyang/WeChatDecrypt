@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Lumine.Fairy.Desktop.Views.ConfirmationWindow"
+        Width="420"
+        MinHeight="190"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Title="确认操作">
+  <Grid RowDefinitions="Auto,Auto,Auto" Margin="22" RowSpacing="16">
+    <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" Foreground="#142033" />
+    <TextBlock x:Name="MessageText" Grid.Row="1" TextWrapping="Wrap" Foreground="#56657A" VerticalAlignment="Center" />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" Click="CancelClick" Padding="16,7" />
+      <Button x:Name="ConfirmButton" Click="ConfirmClick" Padding="16,7" Background="#C62828" Foreground="White" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -21,6 +22,9 @@ namespace Lumine.Fairy.Desktop.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 {
+    public event EventHandler? WorkPageRefreshing;
+    public event EventHandler? WorkPageRefreshed;
+
     private readonly SqliteNotificationStore _store;
     private readonly SqliteTodoStore _todoStore;
     private readonly NotificationService _notificationService;
@@ -30,9 +34,11 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private readonly WeChatAnalysisCoordinator _analysis;
     private readonly IncrementalAnalysisScheduler _scheduler;
     private readonly NotificationHttpServer _notificationApi;
+    private readonly WeChatContextHttpServer? _wechatContextApi;
     private readonly AppSettingsStore _settingsStore;
     private readonly WindowsStartupService _startupService;
     private readonly ContactManagementSqliteStore _contactManagementStore;
+    private readonly WeChatAnalysisContextResolver _wechatAnalysisContextResolver = new();
     private readonly TimeZoneContext _timeZoneContext;
     private readonly DispatcherTimer _clockTimer;
     private AppSettings _appSettings;
@@ -46,6 +52,26 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public ObservableCollection<AnalysisStageItemViewModel> AnalysisStages { get; } = [];
     public IReadOnlyList<TimeZoneOption> TimeZones { get; }
     public ObservableCollection<WorkItemViewModel> WorkItems { get; } = [];
+    public ObservableCollection<TodoListViewModel> TodoLists { get; } = [];
+    public ObservableCollection<TodoCompanyFilterOption> TodoCompanyFilters { get; } = [];
+    public ObservableCollection<TodoCompanyFilterOption> FilteredTodoCompanyFilters { get; } = [];
+    public ObservableCollection<NotificationItemViewModel> WorkNotifications { get; } = [];
+    public IReadOnlyList<WorkTodoFilterOption> WorkTodoFilters { get; } =
+    [
+        new(WorkTodoFilter.All, "全部卡片"),
+        new(WorkTodoFilter.Active, "待办"),
+        new(WorkTodoFilter.InProgress, "进行中"),
+        new(WorkTodoFilter.Completed, "已完成"),
+        new(WorkTodoFilter.Overdue, "逾期"),
+        new(WorkTodoFilter.Archived, "已归档"),
+    ];
+    public IReadOnlyList<WorkTodoSortOption> WorkTodoSorts { get; } =
+    [
+        new(WorkTodoSort.Position, "手动顺序"),
+        new(WorkTodoSort.Priority, "按优先级"),
+        new(WorkTodoSort.DueAt, "按截止时间"),
+        new(WorkTodoSort.CreatedAt, "按创建时间"),
+    ];
     public ContactMainWindowViewModel ContactManagementViewModel { get; }
     public IReadOnlyList<WechatAnalysisContentOptionViewModel> WechatAnalysisContentOptions { get; } =
     [
@@ -73,8 +99,9 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private bool _isWechatWhitelistEnabled;
     [ObservableProperty] private decimal? _wechatAnalysisIntervalMinutes;
     [ObservableProperty] private WechatAutomaticAnalysisModeOption? _selectedWechatAutomaticAnalysisMode;
-    [ObservableProperty] private string _notificationApiEndpoint = "http://127.0.0.1:18765/api/v1/notifications";
+    [ObservableProperty] private string _notificationApiEndpoint = "http://<Fairy-IP>:18765/api/v1/notifications";
     [ObservableProperty] private string _notificationApiToken = "local-dev-notification-token";
+    [ObservableProperty] private bool _isNotificationApiTokenVisible;
     [ObservableProperty] private int _unreadCount;
     [ObservableProperty] private int _selectedNotificationTabIndex;
     [ObservableProperty] private bool _hasUnreadNotifications;
@@ -85,6 +112,21 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [ObservableProperty] private int _workUnreadCount;
     [ObservableProperty] private int _wechatUnreadCount;
     [ObservableProperty] private int _remoteUnreadCount;
+    [ObservableProperty] private bool _hasWorkNotifications;
+    [ObservableProperty] private bool _hasWorkItems;
+    [ObservableProperty] private bool _isWorkPageEmpty = true;
+    [ObservableProperty] private int _selectedWorkTabIndex;
+    [ObservableProperty] private WorkTodoFilterOption? _selectedWorkTodoFilter;
+    [ObservableProperty] private WorkTodoSortOption? _selectedWorkTodoSort;
+    [ObservableProperty] private TodoCompanyFilterOption? _selectedTodoCompanyFilter;
+    [ObservableProperty] private string _todoCompanyFilterText = string.Empty;
+    [ObservableProperty] private string _todoSearchKeyword = string.Empty;
+    [ObservableProperty] private string _newTodoListName = string.Empty;
+    [ObservableProperty] private int _workPendingCount;
+    [ObservableProperty] private int _workInProgressCount;
+    [ObservableProperty] private int _workCompletedCount;
+    [ObservableProperty] private int _workOverdueCount;
+    [ObservableProperty] private int _workPendingConfirmationCount;
     [ObservableProperty] private TimeZoneOption? _selectedTimeZone;
     [ObservableProperty] private bool _isStartupEnabled;
     [ObservableProperty] private string _startupStatusText = string.Empty;
@@ -101,6 +143,9 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private DateTimeOffset? _analysisStartedAt;
     private DateTimeOffset? _analysisEndedAt;
     private Action<NotificationRecord>? _desktopNotificationPresenter;
+    private IReadOnlyList<TodoRecord> _allWorkItems = [];
+    private IReadOnlyList<TodoListRecord> _allTodoLists = [];
+    private TodoBoardRecord _todoBoard = new("default", "工作看板", "#1769D1");
 
     public MainWindowViewModel()
     {
@@ -137,6 +182,8 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             foreach (var stage in AnalysisStages) stage.RefreshDuration(DateTimeOffset.UtcNow);
         };
         _clockTimer.Start();
+        SelectedWorkTodoFilter = WorkTodoFilters[0];
+        SelectedWorkTodoSort = WorkTodoSorts[0];
 
         if (int.TryParse(ReadEnvironment("QwenPawInitialPage"), out var initialPage) && initialPage is >= 0 and <= 6)
             SelectedPageIndex = initialPage;
@@ -168,11 +215,19 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             contactStorageOptions.SchemaVersion,
             contactSnapshot,
             contactGroupChatDirectoryService);
+        RefreshTodoCompanyFilters();
         _analysis = new WeChatAnalysisCoordinator(_wechat, _qwenPaw, _notificationService, _todoService, ResolveConversationCompanyAsync);
         _scheduler = new IncrementalAnalysisScheduler(_wechat, _qwenPaw, _analysis, _notificationService);
         _scheduler.WhitelistLoader = RefreshWechatWhitelistCatalogAsync;
+        _wechatContextApi = CreateWechatContextApi();
         ApplyWechatAnalysisConfiguration(false);
-        _notificationApi = new NotificationHttpServer(_notificationService, token: NotificationApiToken, analysis: _analysis, scheduler: _scheduler);
+        _notificationApi = new NotificationHttpServer(
+            _notificationService,
+            token: NotificationApiToken,
+            analysis: _analysis,
+            scheduler: _scheduler,
+            bindAddress: ReadEnvironment("LumineFairyNotificationBindAddress"));
+        NotificationApiEndpoint = _notificationApi.Endpoint;
         _notificationService.NotificationAdded += OnNotificationAdded;
         _todoService.TodoChanged += OnTodoChanged;
         _analysis.ProgressChanged += OnAnalysisProgressChanged;
@@ -230,6 +285,11 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         if (_scheduler is not null)
             _scheduler.AgentId = value?.Id ?? "default";
+        if (_settingsStore is not null)
+        {
+            _appSettings.WeChatAnalysisAgentId = value?.Id;
+            _settingsStore.Save(_appSettings);
+        }
     }
 
     partial void OnSelectedNotificationTabIndexChanged(int value)
@@ -238,6 +298,41 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(IsUnreadNotificationTabSelected));
         OnPropertyChanged(nameof(IsReadNotificationTabSelected));
         _ = ReloadNotificationsAsync();
+    }
+
+    partial void OnSelectedWorkTodoFilterChanged(WorkTodoFilterOption? value)
+    {
+        RefreshWorkItems();
+        OnPropertyChanged(nameof(WorkSummaryText));
+        OnPropertyChanged(nameof(CanReorderTodos));
+    }
+
+    partial void OnSelectedWorkTodoSortChanged(WorkTodoSortOption? value)
+    {
+        RefreshWorkItems();
+        OnPropertyChanged(nameof(CanReorderTodos));
+    }
+
+    partial void OnSelectedTodoCompanyFilterChanged(TodoCompanyFilterOption? value)
+    {
+        if (value is not null)
+            TodoCompanyFilterText = value.Name;
+
+        RefreshFilteredTodoCompanyFilters();
+        RefreshWorkItems();
+    }
+
+    partial void OnTodoCompanyFilterTextChanged(string value)
+    {
+        RefreshFilteredTodoCompanyFilters();
+        if (!string.Equals(value.Trim(), SelectedTodoCompanyFilter?.Name.Trim(), StringComparison.OrdinalIgnoreCase))
+            RefreshWorkItems();
+    }
+
+    partial void OnTodoSearchKeywordChanged(string value)
+    {
+        RefreshWorkItems();
+        OnPropertyChanged(nameof(CanReorderTodos));
     }
 
     public bool IsAllNotificationTabSelected => SelectedNotificationTabIndex == 0;
@@ -262,7 +357,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         0 => "统一查看本地应用、微信分析和 QwenPaw 任务通知",
         1 => "聚合 TODO、待跟进事项和工作类通知",
         2 => "选择 QwenPaw Agent，分析最近微信会话并生成工作通知",
-        3 => "维护联系人、公司、项目和微信群聊归属",
+        3 => "维护联系人、公司、项目和微信联系人归属",
         4 => "打开 Todo / 日报等独立应用",
         5 => "设备连接、远程控制和设备管理",
         6 => "管理 QwenPaw 连接、本地通知接口和微信分析设置",
@@ -279,8 +374,11 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(IsRemotePageSelected));
         OnPropertyChanged(nameof(IsSettingsPageSelected));
         OnPropertyChanged(nameof(IsNotificationCenterNavSelected));
+        OnPropertyChanged(nameof(IsPageHeaderVisible));
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(PageSubtitle));
+        if (value == 1)
+            _ = ReloadWorkPageAsync();
     }
 
     public bool IsNotificationPageSelected => SelectedPageIndex == 0;
@@ -290,6 +388,15 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     public bool IsAppPageSelected => SelectedPageIndex == 4;
     public bool IsRemotePageSelected => SelectedPageIndex == 5;
     public bool IsSettingsPageSelected => SelectedPageIndex == 6;
+    public bool IsPageHeaderVisible => !IsContactManagementPageSelected && !IsWorkPageSelected;
+
+    public string WorkSummaryText
+        => $"待办 {WorkPendingCount}  ·  进行中 {WorkInProgressCount}  ·  已完成 {WorkCompletedCount}  ·  逾期 {WorkOverdueCount}  ·  待确认 {WorkPendingConfirmationCount}";
+
+    public bool CanReorderTodos
+        => SelectedWorkTodoSort?.Sort == WorkTodoSort.Position
+           && SelectedWorkTodoFilter?.Filter == WorkTodoFilter.All
+           && string.IsNullOrWhiteSpace(TodoSearchKeyword);
 
     private async Task InitializeAsync()
     {
@@ -297,8 +404,19 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             await _notificationApi.StartAsync();
             IsNotificationApiRunning = true;
+            if (_wechatContextApi is not null)
+            {
+                try
+                {
+                    await _wechatContextApi.StartAsync();
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"微信上下文 MCP 未启动：{ex.Message}";
+                }
+            }
             await ReloadNotificationsAsync();
-            await ReloadTodosAsync();
+            await ReloadWorkPageAsync();
             await LoadWechatWhitelistAsync();
 
             Username = ReadEnvironment("QwenPawUser");
@@ -319,6 +437,25 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
            ?? Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.User)
            ?? Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Machine)
            ?? string.Empty;
+
+    private WeChatContextHttpServer? CreateWechatContextApi()
+    {
+        var settings = WeChatContextSettingsLoader.Load();
+        if (string.IsNullOrWhiteSpace(settings.Token)) return null;
+
+        return new WeChatContextHttpServer(settings.Host, settings.Port, settings.Token, async (request, cancellationToken) =>
+        {
+            var snapshot = await _contactManagementStore.LoadAsync(cancellationToken);
+            var account = new ChatAccount(request.AccountId, string.Empty, 1);
+            var session = new ChatSession(
+                request.WeChatUsername,
+                request.DisplayName,
+                string.Empty,
+                0,
+                request.IsGroupChat ? ChatConversationKind.Group : ChatConversationKind.Unknown);
+            return _wechatAnalysisContextResolver.Resolve(snapshot, account, session);
+        });
+    }
 
     [RelayCommand]
     private async Task RefreshWechatWhitelistAsync()
@@ -374,18 +511,8 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         ChatSession session,
         CancellationToken cancellationToken)
     {
-        if (!session.IsGroupConversation) return null;
-
         var snapshot = await _contactManagementStore.LoadAsync(cancellationToken);
-        var groupChat = snapshot.WeChatGroupChats.FirstOrDefault(item =>
-            item.IsActive
-            && string.Equals(item.AccountId, account.Id, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(item.WeChatUsername, session.Username, StringComparison.OrdinalIgnoreCase));
-        if (groupChat is null || string.IsNullOrWhiteSpace(groupChat.CompanyId)) return null;
-
-        var company = snapshot.Companies.FirstOrDefault(item =>
-            item.IsActive && string.Equals(item.Id, groupChat.CompanyId, StringComparison.OrdinalIgnoreCase));
-        return company is null ? null : new ConversationCompanyContext(company.Id, company.Name);
+        return _wechatAnalysisContextResolver.Resolve(snapshot, account, session);
     }
 
     private static IReadOnlyList<WeChatWhitelistEntry> BuildWechatWhitelistCatalog(ContactManagementSnapshot snapshot)
@@ -520,7 +647,11 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             var agents = await _qwenPaw.GetAgentsAsync();
             Agents.Clear();
             foreach (var agent in agents.Where(x => x.Enabled)) Agents.Add(agent);
-            SelectedAgent ??= Agents.FirstOrDefault(x => x.Id == "default") ?? Agents.FirstOrDefault();
+            var configuredAgent = _appSettings.WeChatAnalysisAgentId;
+            SelectedAgent ??= Agents.FirstOrDefault(x => string.Equals(x.Id, configuredAgent, StringComparison.OrdinalIgnoreCase))
+                              ?? Agents.FirstOrDefault(x => string.Equals(x.Id, "WeChatAnalysist", StringComparison.OrdinalIgnoreCase))
+                              ?? Agents.FirstOrDefault(x => string.Equals(x.Id, "default", StringComparison.OrdinalIgnoreCase))
+                              ?? Agents.FirstOrDefault();
             _scheduler.AgentId = SelectedAgent?.Id ?? "default";
         }
         catch (Exception ex) { StatusMessage = $"读取 Agent 失败：{ex.Message}"; }
@@ -555,7 +686,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             await RefreshWechatWhitelistCatalogAsync(CancellationToken.None);
             await _scheduler.AnalyzeNowAsync();
             await ReloadNotificationsAsync();
-            await ReloadTodosAsync();
+            await ReloadWorkPageAsync();
             StatusMessage = "微信分析完成，已发送本地通知。";
         }
         catch (Exception ex) { StatusMessage = $"微信分析失败：{ex.Message}"; }
@@ -587,8 +718,189 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private async Task MarkReadAsync(NotificationRecord? item)
     {
         if (item is null || item.IsRead) return;
-        await _notificationService.MarkReadAsync(item.Id);
-        await ReloadNotificationsAsync();
+        if (!await _notificationService.MarkReadAsync(item.Id)) return;
+
+        await Dispatcher.UIThread.InvokeAsync(() => MarkNotificationItemsRead(item.Id));
+        await Task.WhenAll(ReloadNotificationsAsync(), ReloadWorkPageAsync());
+    }
+
+    private Task EditTodoAsync(TodoRecord? todo)
+        => todo is null ? Task.CompletedTask : ShowTodoEditorAsync(todo, false);
+
+    private async Task CreateTodoAsync(TodoListRecord? targetList)
+    {
+        var list = targetList
+                   ?? _allTodoLists.FirstOrDefault(item => item.Status == "pending")
+                   ?? new TodoListRecord("todo", _todoBoard.Id, "待办", 1, "pending");
+        var now = DateTimeOffset.UtcNow;
+        var todo = new TodoRecord(
+            $"manual:{Guid.NewGuid():N}",
+            string.Empty,
+            string.Empty,
+            "medium",
+            null,
+            null,
+            1,
+            Array.Empty<string>(),
+            list.Status ?? "pending",
+            now,
+            now,
+            null,
+            "manual",
+            string.Empty,
+            BoardId: _todoBoard.Id,
+            ListId: list.Id,
+            Position: list.Position);
+        await ShowTodoEditorAsync(todo, true);
+    }
+
+    [RelayCommand]
+    private async Task AddTodoListAsync()
+    {
+        var name = NewTodoListName.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            StatusMessage = "请输入列表名称。";
+            return;
+        }
+
+        var list = new TodoListRecord(
+            $"list:{Guid.NewGuid():N}",
+            _todoBoard.Id,
+            name,
+            _allTodoLists.Count,
+            null,
+            false);
+        if (await _todoService.AddListAsync(list) is null)
+        {
+            StatusMessage = "列表创建失败。";
+            return;
+        }
+
+        NewTodoListName = string.Empty;
+        await ReloadWorkPageAsync();
+    }
+
+    private async Task ShowTodoEditorAsync(TodoRecord todo, bool isNew)
+    {
+        if (IsBusy) return;
+
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime
+                     as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var window = new Views.TodoEditWindow();
+        var viewModel = new TodoEditWindowViewModel(
+            todo,
+            updated => isNew ? _todoService.AddCandidateAsync(updated) : SaveTodoFromEditorAsync(todo, updated),
+            isNew,
+            _allTodoLists
+            .Where(list => !list.IsArchived || todo.IsArchived || list.Id == todo.ListId)
+                .Select(list => new TodoListOption(list.Id, list.Name, list.Status))
+                .ToList(),
+            BuildTodoCompanyOptions(todo),
+            result => window.Close(result));
+        window.DataContext = viewModel;
+
+        if (owner is null)
+        {
+            window.Show();
+            return;
+        }
+
+        var updatedTodo = await window.ShowDialog<TodoRecord?>(owner);
+        if (updatedTodo is not null)
+            StatusMessage = "TODO 已更新。";
+    }
+
+    private async Task<TodoRecord?> SaveTodoFromEditorAsync(TodoRecord original, TodoRecord edited)
+    {
+        var moved = !string.Equals(original.BoardId, edited.BoardId, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(original.ListId, edited.ListId, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(original.Status, edited.Status, StringComparison.OrdinalIgnoreCase);
+        var details = edited with
+        {
+            BoardId = original.BoardId,
+            ListId = original.ListId,
+            Position = original.Position,
+            Status = original.Status,
+        };
+        var saved = await _todoService.UpdateDetailsAsync(details);
+        if (saved is null || !moved) return saved;
+
+        return await _todoService.MoveAsync(
+            original.Id,
+            edited.BoardId,
+            edited.ListId,
+            original.Position,
+            edited.Status);
+    }
+
+    private async Task<TodoListRecord?> RenameTodoListAsync(TodoListRecord list, string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var updated = await _todoService.UpdateListAsync(list with { Name = name.Trim() });
+        if (updated is not null) await ReloadWorkPageAsync();
+        return updated;
+    }
+
+    private async Task<bool> ArchiveTodoListAsync(TodoListRecord list, bool isArchived)
+    {
+        if (list.Status is not null) return false;
+        var changed = await _todoService.ArchiveListAsync(list.Id, isArchived);
+        if (changed) await ReloadWorkPageAsync();
+        return changed;
+    }
+
+    private async Task<bool> DeleteTodoListAsync(TodoListRecord list)
+    {
+        if (list.Status is not null) return false;
+        var count = _allWorkItems.Count(todo => ResolveListId(todo) == list.Id);
+        var confirmed = await ShowConfirmationAsync(
+            "删除列表",
+            $"确定删除“{list.Name}”列表及其中 {count} 张卡片吗？此操作不可恢复。",
+            "删除列表");
+        if (!confirmed) return false;
+
+        var changed = await _todoService.DeleteListAsync(list.Id);
+        if (changed)
+        {
+            await ReloadWorkPageAsync();
+            StatusMessage = $"已删除列表“{list.Name}”。";
+        }
+        return changed;
+    }
+
+    private async Task ArchiveTodoAsync(TodoRecord todo)
+    {
+        var updated = await _todoService.UpdateDetailsAsync(todo with
+        {
+            IsArchived = !todo.IsArchived,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        });
+        if (updated is not null)
+        {
+            await ReloadWorkPageAsync();
+            StatusMessage = updated.IsArchived ? "卡片已归档。" : "卡片已恢复。";
+        }
+    }
+
+    private async Task DeleteTodoAsync(TodoRecord todo)
+    {
+        var confirmed = await ShowConfirmationAsync("删除卡片", $"确定永久删除“{todo.Title}”吗？此操作不可恢复。", "删除卡片");
+        if (!confirmed) return;
+        if (await _todoService.DeleteAsync(todo.Id))
+        {
+            await ReloadWorkPageAsync();
+            StatusMessage = "卡片已删除。";
+        }
+    }
+
+    private async Task<bool> ShowConfirmationAsync(string title, string message, string confirmText)
+    {
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime
+                     as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null) return false;
+        var window = new Views.ConfirmationWindow(title, message, confirmText);
+        return await window.ShowDialog<bool>(owner);
     }
 
     private async Task HandleNotificationActionAsync(NotificationRecord notification, string actionId)
@@ -599,7 +911,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             await _analysis.HandleNotificationActionAsync(notification, actionId, SelectedAgent?.Id ?? "default");
             await ReloadNotificationsAsync();
-            await ReloadTodosAsync();
+            await ReloadWorkPageAsync();
             StatusMessage = "通知操作已完成。";
         }
         catch (Exception ex)
@@ -616,7 +928,12 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private async Task MarkAllReadAsync()
     {
         await _notificationService.MarkAllReadAsync();
-        await ReloadNotificationsAsync();
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var item in Notifications.Concat(WorkNotifications))
+                item.MarkAsRead();
+        });
+        await Task.WhenAll(ReloadNotificationsAsync(), ReloadWorkPageAsync());
         StatusMessage = "已将全部通知标记为已读。";
     }
 
@@ -679,6 +996,16 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     [RelayCommand]
     private void ToggleNotificationMenu() => IsNotificationMenuOpen = !IsNotificationMenuOpen;
 
+    public string NotificationApiTokenVisibilityToolTip
+        => IsNotificationApiTokenVisible ? "隐藏 Bearer Token" : "显示 Bearer Token";
+
+    partial void OnIsNotificationApiTokenVisibleChanged(bool value)
+        => OnPropertyChanged(nameof(NotificationApiTokenVisibilityToolTip));
+
+    [RelayCommand]
+    private void ToggleNotificationApiTokenVisibility()
+        => IsNotificationApiTokenVisible = !IsNotificationApiTokenVisible;
+
     [RelayCommand]
     private async Task LoadMoreNotificationsAsync()
     {
@@ -692,15 +1019,255 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         if (!string.IsNullOrWhiteSpace(page)) CurrentPage = page;
     }
 
-    private async Task ReloadTodosAsync()
+    private async Task ReloadWorkPageAsync()
     {
-        var todos = await _todoService.ListAsync();
+        _todoBoard = await _todoService.GetBoardAsync();
+        var todosTask = _todoService.ListAsync(includeArchived: true);
+        var listsTask = _todoService.ListListsAsync(_todoBoard.Id, includeArchived: true);
+        var notificationsTask = _notificationService.ListAsync();
+        await Task.WhenAll(todosTask, listsTask, notificationsTask);
+        var todos = await todosTask;
+        var lists = await listsTask;
+        var workNotifications = (await notificationsTask)
+            .Where(IsWorkPageNotification)
+            .ToList();
+
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            WorkItems.Clear();
-            foreach (var todo in todos)
-                WorkItems.Add(WorkItemViewModel.From(todo));
+            WorkPageRefreshing?.Invoke(this, EventArgs.Empty);
+            _allWorkItems = todos;
+            _allTodoLists = lists;
+            RefreshTodoCompanyFilters();
+            RefreshWorkItems();
+            var activeTodos = todos.Where(item => !item.IsArchived).ToList();
+            WorkPendingCount = activeTodos.Count(item => item.Status.Equals("pending", StringComparison.OrdinalIgnoreCase));
+            WorkInProgressCount = activeTodos.Count(item => item.Status.Equals("in_progress", StringComparison.OrdinalIgnoreCase));
+            WorkCompletedCount = activeTodos.Count(item => item.Status.Equals("completed", StringComparison.OrdinalIgnoreCase));
+            WorkOverdueCount = activeTodos.Count(IsOverdueTodo);
+            WorkPendingConfirmationCount = activeTodos.Count(item => item.Status.Equals("pending_confirmation", StringComparison.OrdinalIgnoreCase));
+            OnPropertyChanged(nameof(WorkSummaryText));
+
+            WorkNotifications.Clear();
+            foreach (var notification in workNotifications)
+                WorkNotifications.Add(CreateNotificationItem(notification));
+
+            HasWorkNotifications = WorkNotifications.Count > 0;
+            HasWorkItems = WorkItems.Count > 0;
+            IsWorkPageEmpty = !HasWorkNotifications && !HasWorkItems;
+            WorkPageRefreshed?.Invoke(this, EventArgs.Empty);
         });
+    }
+
+    private void RefreshWorkItems()
+    {
+        WorkItems.Clear();
+        TodoLists.Clear();
+        var filter = SelectedWorkTodoFilter?.Filter ?? WorkTodoFilter.All;
+        var filtered = FilterWorkItems(_allWorkItems, filter)
+            .Where(MatchesTodoCompany)
+            .Where(MatchesTodoSearch)
+            .ToList();
+        foreach (var todo in SortWorkItems(filtered, SelectedWorkTodoSort?.Sort ?? WorkTodoSort.Priority))
+            WorkItems.Add(WorkItemViewModel.From(todo, EditTodoAsync, ArchiveTodoAsync, DeleteTodoAsync));
+
+        foreach (var listRecord in _allTodoLists.Where(list => !list.IsArchived || filter == WorkTodoFilter.Archived))
+        {
+            var list = new TodoListViewModel(
+                listRecord,
+                RenameTodoListAsync,
+                ArchiveTodoListAsync,
+                DeleteTodoListAsync,
+                CreateTodoAsync);
+            foreach (var todo in SortWorkItems(
+                         filtered.Where(item => ResolveListId(item) == listRecord.Id),
+                         SelectedWorkTodoSort?.Sort ?? WorkTodoSort.Priority))
+                list.Cards.Add(WorkItemViewModel.From(todo, EditTodoAsync, ArchiveTodoAsync, DeleteTodoAsync));
+            TodoLists.Add(list);
+        }
+
+        HasWorkItems = TodoLists.Any(list => list.Cards.Count > 0);
+        IsWorkPageEmpty = !HasWorkItems && !HasWorkNotifications;
+    }
+
+    private IEnumerable<TodoRecord> FilterWorkItems(IEnumerable<TodoRecord> todos, WorkTodoFilter filter)
+        => filter switch
+        {
+            WorkTodoFilter.InProgress => todos.Where(item => item.Status.Equals("in_progress", StringComparison.OrdinalIgnoreCase)),
+            WorkTodoFilter.Completed => todos.Where(item => item.Status.Equals("completed", StringComparison.OrdinalIgnoreCase)),
+            WorkTodoFilter.Overdue => todos.Where(IsOverdueTodo),
+            WorkTodoFilter.Archived => todos.Where(item => item.IsArchived || _allTodoLists.Any(list => list.IsArchived && list.Id == ResolveListId(item))),
+            WorkTodoFilter.All => todos.Where(item => !item.IsArchived),
+            _ => todos.Where(item => !item.IsArchived
+                                  && (item.Status.Equals("pending", StringComparison.OrdinalIgnoreCase)
+                                  || item.Status.Equals("in_progress", StringComparison.OrdinalIgnoreCase))),
+        };
+
+    private bool MatchesTodoSearch(TodoRecord todo)
+    {
+        if (string.IsNullOrWhiteSpace(TodoSearchKeyword)) return true;
+        var keyword = TodoSearchKeyword.Trim();
+        return todo.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+            || todo.Summary.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+            || (todo.Assignee?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (todo.CompanyName?.Contains(keyword, StringComparison.OrdinalIgnoreCase) ?? false)
+            || todo.Priority.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesTodoCompany(TodoRecord todo)
+    {
+        var selected = SelectedTodoCompanyFilter;
+        return selected is null || selected.Id == "*"
+               || selected.Id is null && string.IsNullOrWhiteSpace(todo.CompanyId)
+               || selected.Id is not null && selected.Id != "*" && string.Equals(todo.CompanyId, selected.Id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RefreshTodoCompanyFilters()
+    {
+        var hadPreviousSelection = SelectedTodoCompanyFilter is not null;
+        var previous = SelectedTodoCompanyFilter?.Id;
+        var options = new List<TodoCompanyFilterOption> { new("*", "全部公司") };
+        options.AddRange(ContactManagementViewModel.Companies
+            .Where(company => company.IsActive && !string.IsNullOrWhiteSpace(company.Name))
+            .OrderBy(company => company.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(company => new TodoCompanyFilterOption(company.Id, company.DisplayName)));
+        options.Add(new(null, "未设置公司"));
+
+        TodoCompanyFilters.Clear();
+        foreach (var option in options)
+            TodoCompanyFilters.Add(option);
+        SelectedTodoCompanyFilter = hadPreviousSelection
+            ? TodoCompanyFilters.FirstOrDefault(option => option.Id == previous) ?? TodoCompanyFilters[0]
+            : TodoCompanyFilters[0];
+        TodoCompanyFilterText = SelectedTodoCompanyFilter.Name;
+        RefreshFilteredTodoCompanyFilters();
+    }
+
+    private void RefreshFilteredTodoCompanyFilters()
+    {
+        var selectedOption = SelectedTodoCompanyFilter;
+        var searchText = string.Equals(
+            TodoCompanyFilterText.Trim(),
+            selectedOption?.Name.Trim(),
+            StringComparison.OrdinalIgnoreCase)
+            ? string.Empty
+            : TodoCompanyFilterText;
+        var items = TodoCompanyFilters
+            .Where(option => option == selectedOption
+                || CompanyOptionSearch.Matches(option.Name, searchText))
+            .ToList();
+
+        for (var index = FilteredTodoCompanyFilters.Count - 1; index >= 0; index--)
+        {
+            if (!items.Contains(FilteredTodoCompanyFilters[index]))
+                FilteredTodoCompanyFilters.RemoveAt(index);
+        }
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            if (index >= FilteredTodoCompanyFilters.Count || FilteredTodoCompanyFilters[index] != items[index])
+            {
+                if (FilteredTodoCompanyFilters.Contains(items[index]))
+                    FilteredTodoCompanyFilters.Move(FilteredTodoCompanyFilters.IndexOf(items[index]), index);
+                else
+                    FilteredTodoCompanyFilters.Insert(index, items[index]);
+            }
+        }
+    }
+
+    private IReadOnlyList<TodoCompanyOption> BuildTodoCompanyOptions(TodoRecord todo)
+    {
+        var options = new List<TodoCompanyOption> { new(null, "未设置") };
+        options.AddRange(ContactManagementViewModel.Companies
+            .Where(company => company.IsActive && !string.IsNullOrWhiteSpace(company.Name))
+            .OrderBy(company => company.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(company => new TodoCompanyOption(company.Id, company.DisplayName)));
+        if (!string.IsNullOrWhiteSpace(todo.CompanyId) && options.All(option => option.Id != todo.CompanyId))
+            options.Add(new(todo.CompanyId, todo.CompanyName ?? "已删除公司"));
+        return options;
+    }
+
+    private string ResolveListId(TodoRecord todo)
+    {
+        if (_allTodoLists.Any(list => list.Id == todo.ListId)) return todo.ListId;
+        return todo.Status switch
+        {
+            "in_progress" => "in-progress",
+            "completed" => "done",
+            _ => "todo",
+        };
+    }
+
+    public async Task MoveTodoAsync(string todoId, string listId, int position)
+    {
+        var targetList = _allTodoLists.FirstOrDefault(list => list.Id == listId);
+        var todo = _allWorkItems.FirstOrDefault(item => item.Id == todoId);
+        if (targetList is null || todo is null) return;
+
+        var status = targetList.Status ?? todo.Status;
+        if (await _todoService.MoveAsync(todoId, targetList.BoardId, targetList.Id, position, status) is not null)
+        {
+            await ReloadWorkPageAsync();
+            StatusMessage = "卡片已移动。";
+        }
+    }
+
+    public async Task MoveTodoListAsync(string listId, int position)
+    {
+        var list = _allTodoLists.FirstOrDefault(item => item.Id == listId);
+        if (list is null || list.IsArchived) return;
+        if (await _todoService.MoveListAsync(list.Id, list.BoardId, position) is not null)
+        {
+            await ReloadWorkPageAsync();
+            StatusMessage = "列表已移动。";
+        }
+    }
+
+    private static IEnumerable<TodoRecord> SortWorkItems(IEnumerable<TodoRecord> todos, WorkTodoSort sort)
+        => sort switch
+        {
+            WorkTodoSort.Position => todos
+                .OrderBy(item => item.Position)
+                .ThenByDescending(item => item.CreatedAt),
+            WorkTodoSort.DueAt => todos
+                .OrderBy(item => item.DueAt is null)
+                .ThenBy(item => item.DueAt)
+                .ThenByDescending(item => item.CreatedAt),
+            WorkTodoSort.CreatedAt => todos.OrderByDescending(item => item.CreatedAt),
+            _ => todos
+                .OrderBy(item => PriorityRank(item.Priority))
+                .ThenBy(item => item.DueAt is null)
+                .ThenBy(item => item.DueAt)
+                .ThenByDescending(item => item.CreatedAt),
+        };
+
+    private static int PriorityRank(string priority)
+        => priority.Trim().ToLowerInvariant() switch
+        {
+            "urgent" or "critical" => 0,
+            "high" or "高" => 1,
+            "medium" or "normal" or "中" => 2,
+            "low" or "低" => 3,
+            _ => 4,
+        };
+
+    private static bool IsOverdueTodo(TodoRecord todo)
+        => todo.Status is not "completed"
+           && todo.DueAt is not null
+           && todo.DueAt.Value < DateTimeOffset.UtcNow;
+
+    private static bool IsWorkPageNotification(NotificationRecord notification)
+        => notification.Category.Equals("work", StringComparison.OrdinalIgnoreCase)
+           && !notification.IsResolved
+           && (notification.Actions.Count > 0 || !notification.IsRead);
+
+    private NotificationItemViewModel CreateNotificationItem(NotificationRecord notification)
+        => new(notification, _timeZoneContext, HandleNotificationActionAsync, MarkReadAsync);
+
+    private void MarkNotificationItemsRead(string notificationId)
+    {
+        foreach (var item in Notifications.Concat(WorkNotifications)
+                     .Where(item => string.Equals(item.Id, notificationId, StringComparison.OrdinalIgnoreCase)))
+            item.MarkAsRead();
     }
 
     private async Task ReloadNotificationsAsync()
@@ -731,7 +1298,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         {
             if (reset) Notifications.Clear();
             foreach (var item in items)
-                Notifications.Add(new NotificationItemViewModel(item, _timeZoneContext, HandleNotificationActionAsync));
+                Notifications.Add(CreateNotificationItem(item));
             _notificationOffset += items.Count;
             HasMoreNotifications = items.Count == NotificationPageSize;
             UnreadCount = unreadItems.Count(x => !x.IsResolved);
@@ -748,7 +1315,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         _ = Dispatcher.UIThread.InvokeAsync(async () =>
         {
             await ReloadNotificationsAsync();
-            await ReloadTodosAsync();
+            await ReloadWorkPageAsync();
             StatusMessage = $"新通知：{notification.Title}";
             ShowToast(notification);
         });
@@ -792,7 +1359,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private void OnTodoChanged(object? sender, TodoRecord todo)
     {
-        _ = ReloadTodosAsync();
+        _ = ReloadWorkPageAsync();
     }
 
     private void ShowToast(NotificationRecord notification)
@@ -807,6 +1374,8 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         _todoService.TodoChanged -= OnTodoChanged;
         _analysis.ProgressChanged -= OnAnalysisProgressChanged;
         await _notificationApi.DisposeAsync();
+        if (_wechatContextApi is not null)
+            await _wechatContextApi.DisposeAsync();
         await _scheduler.DisposeAsync();
         _wechat.Dispose();
         _qwenPaw.Dispose();
@@ -871,35 +1440,187 @@ public sealed class WechatAnalysisContentOptionViewModel : ObservableObject
 
 public sealed record WechatAutomaticAnalysisModeOption(WeChatAutomaticAnalysisMode Mode, string Name);
 
-public sealed record WorkItemViewModel(
-    string Id,
-    string Title,
-    string Summary,
-    string Status,
-    string Priority,
-    string Source,
-    string Assignee,
-    string DueAtText,
-    string CompanyName)
+public enum WorkTodoFilter
 {
-    public static WorkItemViewModel From(TodoRecord todo)
-        => new(
-            todo.Id,
-            todo.Title,
-            todo.Summary,
-            todo.Status switch
-            {
-                "pending_confirmation" => "等待确认",
-                "pending" => "待处理",
-                "in_progress" => "进行中",
-                "completed" => "已完成",
-                _ => todo.Status,
-            },
-            todo.Priority,
-            todo.Source,
-            todo.Assignee ?? string.Empty,
-            todo.DueAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? string.Empty,
-            todo.CompanyName ?? string.Empty);
+    Active,
+    InProgress,
+    Completed,
+    All,
+    Overdue,
+    Archived,
+}
+
+public sealed record WorkTodoFilterOption(WorkTodoFilter Filter, string Name);
+
+public enum WorkTodoSort
+{
+    Position,
+    Priority,
+    DueAt,
+    CreatedAt,
+}
+
+public sealed record WorkTodoSortOption(WorkTodoSort Sort, string Name);
+
+public sealed record TodoCompanyFilterOption(string? Id, string Name);
+
+public sealed class TodoListViewModel : ObservableObject
+{
+    private readonly TodoListRecord _original;
+    private readonly Func<TodoListRecord, string, Task<TodoListRecord?>> _renameHandler;
+    private readonly Func<TodoListRecord, bool, Task<bool>> _archiveHandler;
+    private readonly Func<TodoListRecord, Task<bool>> _deleteHandler;
+    private readonly Func<TodoListRecord, Task> _createCardHandler;
+    private string _name;
+    private bool _isEditingName;
+
+    public TodoListViewModel(
+        TodoListRecord list,
+        Func<TodoListRecord, string, Task<TodoListRecord?>> renameHandler,
+        Func<TodoListRecord, bool, Task<bool>> archiveHandler,
+        Func<TodoListRecord, Task<bool>> deleteHandler,
+        Func<TodoListRecord, Task> createCardHandler)
+    {
+        _original = list;
+        _name = list.Name;
+        _renameHandler = renameHandler;
+        _archiveHandler = archiveHandler;
+        _deleteHandler = deleteHandler;
+        _createCardHandler = createCardHandler;
+        Cards.CollectionChanged += (_, _) => OnPropertyChanged(nameof(CardCountText));
+        ArchiveCommand = new AsyncRelayCommand(ArchiveAsync, () => CanArchive || CanRestore);
+        DeleteCommand = new AsyncRelayCommand(() => _deleteHandler(_original), () => CanDelete);
+        BeginRenameCommand = new RelayCommand(() => IsEditingName = true, () => CanRename);
+        AddCardCommand = new AsyncRelayCommand(() => _createCardHandler(_original));
+    }
+
+    public ObservableCollection<WorkItemViewModel> Cards { get; } = [];
+    public TodoListRecord Record => _original;
+    public IAsyncRelayCommand ArchiveCommand { get; }
+    public IAsyncRelayCommand DeleteCommand { get; }
+    public IRelayCommand BeginRenameCommand { get; }
+    public IAsyncRelayCommand AddCardCommand { get; }
+    public string Id => _original.Id;
+    public string Status => _original.Status switch
+    {
+        "pending_confirmation" => "待确认",
+        "pending" => "待办",
+        "in_progress" => "进行中",
+        "completed" => "已完成",
+        _ => string.Empty,
+    };
+    public bool CanRename => !string.Equals(_original.Id, "pending-confirmation", StringComparison.OrdinalIgnoreCase);
+    public bool CanArchive => _original.Status is null && !_original.IsArchived;
+    public bool CanRestore => _original.Status is null && _original.IsArchived;
+    public bool CanDelete => _original.Status is null;
+    public string ArchiveActionText => _original.IsArchived ? "恢复" : "归档";
+    public string CardCountText => $"{Cards.Count} 张卡片";
+    public bool IsEditingName
+    {
+        get => _isEditingName;
+        set => SetProperty(ref _isEditingName, value);
+    }
+
+    public string Name
+    {
+        get => _name;
+        set
+        {
+            SetProperty(ref _name, value);
+        }
+    }
+
+    public async Task SaveNameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Name)) return;
+        var updated = await _renameHandler(_original, Name);
+        if (updated is not null)
+        {
+            _name = updated.Name;
+            OnPropertyChanged(nameof(Name));
+        }
+        IsEditingName = false;
+    }
+
+    private async Task ArchiveAsync()
+        => await _archiveHandler(_original, !_original.IsArchived);
+}
+
+public sealed class WorkItemViewModel : ObservableObject
+{
+    private WorkItemViewModel(
+        TodoRecord todo,
+        Func<TodoRecord, Task> editHandler,
+        Func<TodoRecord, Task> archiveHandler,
+        Func<TodoRecord, Task> deleteHandler)
+    {
+        Record = todo;
+        EditCommand = new AsyncRelayCommand(() => editHandler(todo));
+        ArchiveCommand = new AsyncRelayCommand(() => archiveHandler(todo));
+        DeleteCommand = new AsyncRelayCommand(() => deleteHandler(todo));
+        LabelBadges = (todo.Labels ?? Array.Empty<TodoLabel>())
+            .Select(label => new TodoLabelBadgeViewModel(label))
+            .ToList();
+    }
+
+    public TodoRecord Record { get; }
+    public IAsyncRelayCommand EditCommand { get; }
+    public IAsyncRelayCommand ArchiveCommand { get; }
+    public IAsyncRelayCommand DeleteCommand { get; }
+    public string Id => Record.Id;
+    public string ListId => Record.ListId;
+    public string Title => Record.Title;
+    public string Summary => Record.Summary;
+    public string Status => Record.Status switch
+    {
+        "pending_confirmation" => "等待确认",
+        "pending" => "待处理",
+        "in_progress" => "进行中",
+        "completed" => "已完成",
+        _ => Record.Status,
+    };
+    public string Priority => Record.Priority.Trim().ToLowerInvariant() switch
+    {
+        "high" or "urgent" or "critical" or "高" => "High",
+        "low" or "低" => "Low",
+        _ => "Medium",
+    };
+    public string Source => Record.Source;
+    public string Assignee => Record.Assignee ?? string.Empty;
+    public string DueAtText => Record.DueAt?.ToLocalTime().ToString("MM/dd") ?? string.Empty;
+    public string CompanyName => Record.CompanyName ?? string.Empty;
+    public IReadOnlyList<TodoLabel> Labels => Record.Labels ?? Array.Empty<TodoLabel>();
+    public string LabelText => string.Join("  ", Labels.Select(label => label.Name));
+    public IReadOnlyList<TodoLabelBadgeViewModel> LabelBadges { get; }
+    public string ChecklistSummary
+        => Record.Checklist is { Count: > 0 } checklist
+            ? $"{checklist.Count(item => item.IsCompleted)}/{checklist.Count}"
+            : string.Empty;
+    public bool HasLabels => Labels.Count > 0;
+    public bool HasChecklist => !string.IsNullOrWhiteSpace(ChecklistSummary);
+    public string EditHint => "点击卡片编辑";
+
+    public string ArchiveActionText => Record.IsArchived ? "恢复" : "归档";
+
+    public static WorkItemViewModel From(
+        TodoRecord todo,
+        Func<TodoRecord, Task> editHandler,
+        Func<TodoRecord, Task> archiveHandler,
+        Func<TodoRecord, Task> deleteHandler)
+        => new(todo, editHandler, archiveHandler, deleteHandler);
+}
+
+public sealed class TodoLabelBadgeViewModel
+{
+    public TodoLabelBadgeViewModel(TodoLabel label)
+    {
+        Name = label.Name;
+        BackgroundBrush = TodoLabelColors.CreateBrush(label.Color);
+    }
+
+    public string Name { get; }
+    public SolidColorBrush BackgroundBrush { get; }
+    public SolidColorBrush ForegroundBrush { get; } = TodoLabelColors.CreateBrush("#FFFFFF");
 }
 
 public sealed record TimeZoneOption(string Id, string DisplayName, string OffsetText);
@@ -907,16 +1628,24 @@ public sealed record TimeZoneOption(string Id, string DisplayName, string Offset
 public sealed class NotificationItemViewModel : ObservableObject
 {
     private readonly TimeZoneContext _timeZoneContext;
+    private bool _isRead;
     public NotificationRecord Record { get; }
     public IReadOnlyList<NotificationActionItemViewModel> Actions { get; }
+    public IAsyncRelayCommand MarkReadCommand { get; }
 
-    public NotificationItemViewModel(NotificationRecord record, TimeZoneContext timeZoneContext, Func<NotificationRecord, string, Task> actionHandler)
+    public NotificationItemViewModel(
+        NotificationRecord record,
+        TimeZoneContext timeZoneContext,
+        Func<NotificationRecord, string, Task> actionHandler,
+        Func<NotificationRecord, Task> markReadHandler)
     {
         Record = record;
+        _isRead = record.IsRead;
         _timeZoneContext = timeZoneContext;
         Actions = record.Actions
             .Select(action => new NotificationActionItemViewModel(action, () => actionHandler(record, action.Id)))
             .ToList();
+        MarkReadCommand = new AsyncRelayCommand(() => markReadHandler(record), () => !IsRead);
     }
 
     public string Id => Record.Id;
@@ -924,13 +1653,21 @@ public sealed class NotificationItemViewModel : ObservableObject
     public string Body => Record.Body;
     public string Source => Record.Source;
     public string Category => Record.Category;
-    public bool IsRead => Record.IsRead;
+    public bool IsRead => _isRead;
     public bool IsResolved => Record.IsResolved;
     public bool HasActions => Actions.Count > 0 && !Record.IsResolved;
     public string CreatedAtText => _timeZoneContext.Format(Record.CreatedAt, "yyyy-MM-dd HH:mm");
 
     public void RefreshTime()
         => OnPropertyChanged(nameof(CreatedAtText));
+
+    public void MarkAsRead()
+    {
+        if (_isRead) return;
+        _isRead = true;
+        OnPropertyChanged(nameof(IsRead));
+        MarkReadCommand.NotifyCanExecuteChanged();
+    }
 }
 
 public sealed class NotificationActionItemViewModel : ObservableObject

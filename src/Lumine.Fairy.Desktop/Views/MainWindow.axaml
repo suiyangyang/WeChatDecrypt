@@ -58,14 +58,95 @@
             <Setter Property="BorderBrush" Value="#E4E6EA"/>
             <Setter Property="Opacity" Value="0.72"/>
         </Style>
+        <Style Selector="Border.todo-card">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E4E8EF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Border.todo-card:pointerover">
+            <Setter Property="Background" Value="#F7FBFF"/>
+            <Setter Property="BorderBrush" Value="#9EC5FF"/>
+        </Style>
+        <Style Selector="Border.todo-card Button.todo-card-more">
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+        <Style Selector="Border.todo-card:pointerover Button.todo-card-more">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Border.todo-card-tag">
+            <Setter Property="Background" Value="#000000"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="Margin" Value="0,0,5,5"/>
+        </Style>
+        <Style Selector="Border.todo-card-tag TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="Border.todo-card-meta">
+            <Setter Property="Background" Value="#1C90ED"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="7,3"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.todo-card-meta TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style Selector="Border.todo-list">
+            <Setter Property="Width" Value="300"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Background" Value="#F1F4F8"/>
+            <Setter Property="BorderBrush" Value="#E0E5EC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="10"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+        </Style>
+        <Style Selector="Border.todo-list-handle">
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.todo-filter-button">
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="MinWidth" Value="32"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="6"/>
+            <Setter Property="Background" Value="#F1F4F8"/>
+            <Setter Property="BorderBrush" Value="#DCE3EC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Foreground" Value="#3D4A5C"/>
+        </Style>
+        <Style Selector="Button.todo-filter-button:pointerover">
+            <Setter Property="Background" Value="#E8F1FF"/>
+            <Setter Property="BorderBrush" Value="#9EC5FF"/>
+            <Setter Property="Foreground" Value="#1769D1"/>
+        </Style>
+        <Style Selector="Border.todo-filter-flyout">
+            <Setter Property="Width" Value="248"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#DCE3EC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+        </Style>
         <Style Selector="TextBlock.page-title">
-            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#171A1F"/>
         </Style>
         <Style Selector="TextBlock.muted">
             <Setter Property="Foreground" Value="#737A87"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style Selector="Button.nav-item">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -104,7 +185,7 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Foreground" Value="#4D5664"/>
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="Padding" Value="8"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
@@ -160,7 +241,7 @@
         </Style>
         <Style Selector="TextBlock.notification-state">
             <Setter Property="Foreground" Value="#8A919D"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style Selector="Border.more-menu">
             <Setter Property="Background" Value="#FFFFFF"/>
@@ -206,14 +287,14 @@
                         <Border Classes="notification-card" Classes.read="{Binding IsRead}" Margin="0,0,0,8">
                             <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
                                 <Border Width="34" Height="34" CornerRadius="17" Background="#E2ECFF" VerticalAlignment="Top" Margin="0,0,12,0">
-                                    <TextBlock Text="✓" FontSize="17" Foreground="#2875D7" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Text="✓" FontSize="16" Foreground="#2875D7" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <StackPanel Grid.Column="1" Spacing="3">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#242830" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" Foreground="#242830" TextTrimming="CharacterEllipsis"/>
                                         <TextBlock Text="已读" Classes="notification-state" IsVisible="{Binding IsRead}" VerticalAlignment="Center"/>
                                     </StackPanel>
-                                    <TextBlock Text="{Binding Body}" Foreground="#6D7480" FontSize="13" TextWrapping="Wrap" MaxHeight="38"/>
+                                    <TextBlock Text="{Binding Body}" Foreground="#6D7480" FontSize="12" TextWrapping="Wrap" MaxHeight="38"/>
                                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
                                         <TextBlock Text="{Binding Source}" Classes="muted"/>
                                         <TextBlock Text="{Binding Category}" Classes="muted"/>
@@ -234,7 +315,7 @@
                                 <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="7">
                                     <TextBlock Text="{Binding CreatedAtText}" Foreground="#737A87" FontSize="12" HorizontalAlignment="Right"/>
                                     <Ellipse Width="8" Height="8" Fill="#1769D1" HorizontalAlignment="Right" IsVisible="{Binding IsRead, Converter={StaticResource InverseBooleanConverter}}"/>
-                                    <Button Classes="read-icon-button" ToolTip.Tip="标记已读" IsEnabled="{Binding IsRead, Converter={StaticResource InverseBooleanConverter}}" Command="{Binding $parent[Window].DataContext.MarkReadCommand}" CommandParameter="{Binding Record}"><TextBlock Text="✓" FontSize="17" Foreground="#1769D1" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
+                                    <Button Classes="read-icon-button" ToolTip.Tip="标记已读" Command="{Binding MarkReadCommand}"><TextBlock Text="✓" FontSize="16" Foreground="#1769D1" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -248,7 +329,7 @@
                     <Border Width="30" Height="30" CornerRadius="8" Background="#102E70">
                         <Image Source="avares://Lumine.Fairy.Desktop/Assets/fairy-tray-simple-256.png" Stretch="Uniform" Margin="2"/>
                     </Border>
-                    <TextBlock Text="Fairy" FontSize="17" FontWeight="SemiBold" Foreground="#171A1F" VerticalAlignment="Center"/>
+                    <TextBlock Text="Fairy" FontSize="16" FontWeight="SemiBold" Foreground="#171A1F" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="1">
@@ -268,13 +349,13 @@
                         <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><Path Data="M5,5.5H19C20.1,5.5 21,6.4 21,7.5V16.5C21,17.6 20.1,18.5 19,18.5H5C3.9,18.5 3,17.6 3,16.5V7.5C3,6.4 3.9,5.5 5,5.5Z M7,8.5H9 M11,8.5H17 M7,12H9 M11,12H17 M7,15.5H9 M11,15.5H15" Width="20" Height="20" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="App"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="2" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
                     </Button>
                     <Button Background="{Binding IsRemotePageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsRemotePageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="5">
-                        <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><TextBlock Text="▣" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="远程设备"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="{Binding RemoteUnreadCount}" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
+                        <Grid Classes="nav-row" ColumnDefinitions="24,*,Auto"><TextBlock Text="▣" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="远程设备"/><Border Grid.Column="2" Classes="count-badge" Background="#EEF0F3"><TextBlock Text="{Binding RemoteUnreadCount}" Foreground="#68717E" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid>
                     </Button>
                 </StackPanel>
 
                 <Border Grid.Row="2" BorderBrush="#E5E9F0" BorderThickness="0,1,0,0" Padding="0,12,0,0">
                     <StackPanel>
-                        <Button Background="{Binding IsSettingsPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsSettingsPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="6"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M19.43,12.98 C19.47,12.66 19.5,12.34 19.5,12 C19.5,11.66 19.47,11.34 19.43,11.02 L21.54,9.37 L19.54,5.91 L17.05,6.91 C16.54,6.53 15.97,6.21 15.35,5.99 L15,3.35 H11 L10.65,5.99 C10.03,6.21 9.46,6.53 8.95,6.91 L6.46,5.91 L4.46,9.37 L6.57,11.02 C6.53,11.34 6.5,11.66 6.5,12 C6.5,12.34 6.53,12.66 6.57,12.98 L4.46,14.63 L6.46,18.09 L8.95,17.09 C9.46,17.47 10.03,17.79 10.65,18.01 L11,20.65 H15 L15.35,18.01 C15.97,17.79 16.54,17.47 17.05,17.09 L19.54,18.09 L21.54,14.63 Z" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/><Ellipse Width="7" Height="7" Margin="2,0,0,0" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid><TextBlock Grid.Column="1" Text="设置"/></Grid></Button>
+                        <Button Background="{Binding IsSettingsPageSelected, Converter={StaticResource NavBackgroundConverter}}" HorizontalContentAlignment="Stretch" Classes="nav-item" Classes.active="{Binding IsSettingsPageSelected}" Command="{Binding NavigateToPageCommand}" CommandParameter="6"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Grid Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"><Path Data="M19.43,12.98 C19.47,12.66 19.5,12.34 19.5,12 C19.5,11.66 19.47,11.34 19.43,11.02 L21.54,9.37 L19.54,5.91 L17.05,6.91 C16.54,6.53 15.97,6.21 15.35,5.99 L15,3.35 H11 L10.65,5.99 C10.03,6.21 9.46,6.53 8.95,6.91 L6.46,5.91 L4.46,9.37 L6.57,11.02 C6.53,11.34 6.5,11.66 6.5,12 C6.5,12.34 6.53,12.66 6.57,12.98 L4.46,14.63 L6.46,18.09 L8.95,17.09 C9.46,17.47 10.03,17.79 10.65,18.01 L11,20.65 H15 L15.35,18.01 C15.97,17.79 16.54,17.47 17.05,17.09 L19.54,18.09 L21.54,14.63 Z M16.5,12 A3.5,3.5 0 1 1 9.5,12 A3.5,3.5 0 1 1 16.5,12 Z" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.45" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid><TextBlock Grid.Column="1" Text="设置"/></Grid></Button>
                         <Button HorizontalContentAlignment="Stretch" Classes="nav-item" Command="{Binding TestNotificationCommand}"><Grid Classes="nav-row" ColumnDefinitions="24,*"><Path Data="M12,21 A9,9 0 1 0 12,3 A9,9 0 0 0 12,21 Z M12,10.5 V16 M12,7.5 V7.6" Width="20" Height="20" Fill="Transparent" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.55" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="关于"/></Grid></Button>
                     </StackPanel>
                 </Border>
@@ -282,7 +363,7 @@
         </Border>
 
         <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="28,24,28,24">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20" IsVisible="{Binding !IsContactManagementPageSelected}">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20" IsVisible="{Binding IsPageHeaderVisible}">
                     <StackPanel>
                     <TextBlock Text="{Binding PageTitle}" Classes="page-title"/>
                     <TextBlock Text="{Binding PageSubtitle}" Classes="muted" Margin="0,4,0,0"/>
@@ -297,14 +378,14 @@
                         <Border Classes="more-menu">
                         <StackPanel Spacing="3">
                             <Button Classes="more-menu-item" Command="{Binding TestNotificationCommand}">
-                                <Grid ColumnDefinitions="26,*"><TextBlock Text="◎" FontSize="18" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="测试通知" VerticalAlignment="Center"/></Grid>
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="◎" FontSize="16" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="测试通知" VerticalAlignment="Center"/></Grid>
                             </Button>
                             <Button Classes="more-menu-item" Command="{Binding MarkAllReadCommand}">
-                                <Grid ColumnDefinitions="26,*"><TextBlock Text="✓" FontSize="18" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="全部标记已读" VerticalAlignment="Center"/></Grid>
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="✓" FontSize="16" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="全部标记已读" VerticalAlignment="Center"/></Grid>
                             </Button>
                             <Border Height="1" Background="#E5E9F0" Margin="4,5"/>
                             <Button Classes="more-menu-item" Command="{Binding ToggleNotificationMenuCommand}">
-                                <Grid ColumnDefinitions="26,*"><TextBlock Text="×" FontSize="20" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="关闭菜单" VerticalAlignment="Center"/></Grid>
+                                <Grid ColumnDefinitions="26,*"><TextBlock Text="×" FontSize="16" Foreground="#142033" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="关闭菜单" VerticalAlignment="Center"/></Grid>
                             </Button>
                         </StackPanel>
                         </Border>
@@ -331,8 +412,184 @@
                     </Grid>
                 </Grid>
                 <Grid IsVisible="{Binding IsWorkPageSelected}">
-                    <ScrollViewer><ItemsControl ItemsSource="{Binding WorkItems}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:WorkItemViewModel"><Border Classes="card" Margin="0,0,0,10"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"><StackPanel><TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="muted" Margin="0,5,0,0"/><TextBlock Text="{Binding Source}" Classes="muted" Margin="0,5,0,0"/><TextBlock Text="{Binding CompanyName, StringFormat=公司：{0}}" Classes="muted" IsVisible="{Binding CompanyName, Converter={StaticResource StringToVisibilityConverter}}" Margin="0,5,0,0"/></StackPanel><Border Grid.Column="1" Background="#E8F2FF" CornerRadius="12" Padding="12,6"><TextBlock Text="{Binding Priority}" Foreground="#0F6CBD"/></Border><StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="14" Margin="0,12,0,0"><TextBlock Text="{Binding Status}" Foreground="#56657A"/><TextBlock Text="{Binding Assignee}" Classes="muted" IsVisible="{Binding Assignee, Converter={StaticResource StringToVisibilityConverter}}"/><TextBlock Text="{Binding DueAtText}" Classes="muted" IsVisible="{Binding DueAtText, Converter={StaticResource StringToVisibilityConverter}}"/></StackPanel></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
-                    </Grid>
+                    <TabControl SelectedIndex="{Binding SelectedWorkTabIndex, Mode=TwoWay}">
+                        <TabItem Header="TODO">
+                            <Grid RowDefinitions="Auto,Auto,*" RowSpacing="10" Margin="0,10,0,0">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                    <StackPanel>
+                                        <TextBox Text="{Binding TodoSearchKeyword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索标题、摘要、负责人、公司或优先级" Margin="0,8,0,0" Width="360" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <ComboBox Width="110" ItemsSource="{Binding WorkTodoSorts}" SelectedItem="{Binding SelectedWorkTodoSort, Mode=TwoWay}" ToolTip.Tip="排序方式">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:WorkTodoSortOption">
+                                                    <TextBlock Text="{Binding Name}"/>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <Button Classes="todo-filter-button" ToolTip.Tip="按状态和公司筛选">
+                                            <Path Width="18" Height="18" Data="M5,6.5 L19,6.5 M7.5,12 L16.5,12 M10,17.5 L14,17.5" Stroke="#69717B" StrokeThickness="1.7" StrokeLineCap="Round" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <Button.Flyout>
+                                                <Flyout Placement="BottomEdgeAlignedRight">
+                                                    <Border Classes="todo-filter-flyout">
+                                                        <StackPanel Spacing="7">
+                                                            <TextBlock Text="状态" Classes="muted"/>
+                                                            <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding WorkTodoFilters}" SelectedItem="{Binding SelectedWorkTodoFilter, Mode=TwoWay}">
+                                                                <ComboBox.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:WorkTodoFilterOption">
+                                                                        <TextBlock Text="{Binding Name}"/>
+                                                                    </DataTemplate>
+                                                                </ComboBox.ItemTemplate>
+                                                            </ComboBox>
+                                                            <TextBlock Text="公司" Classes="muted" Margin="0,4,0,0"/>
+                                                            <ComboBox Classes="todo-company-filter" HorizontalAlignment="Stretch" ItemsSource="{Binding FilteredTodoCompanyFilters}" SelectedItem="{Binding SelectedTodoCompanyFilter, Mode=TwoWay}" Text="{Binding TodoCompanyFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" PlaceholderText="输入公司名称或拼音">
+                                                                <ComboBox.SelectionBoxItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:TodoCompanyFilterOption">
+                                                                        <TextBlock Text="{Binding Name}"/>
+                                                                    </DataTemplate>
+                                                                </ComboBox.SelectionBoxItemTemplate>
+                                                                <ComboBox.ItemTemplate>
+                                                                    <DataTemplate x:DataType="vm:TodoCompanyFilterOption">
+                                                                        <TextBlock Text="{Binding Name}"/>
+                                                                    </DataTemplate>
+                                                                </ComboBox.ItemTemplate>
+                                                            </ComboBox>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </Flyout>
+                                            </Button.Flyout>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Grid.Row="1">
+                                    <TextBlock Text="{Binding WorkSummaryText}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                </Grid>
+                                <ScrollViewer x:Name="TodoListsScrollViewer" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" ScrollChanged="TodoListsScrollChanged">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <ItemsControl ItemsSource="{Binding TodoLists}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:TodoListViewModel">
+                                                    <Border Classes="todo-list" DragDrop.AllowDrop="True" DragDrop.DragOver="TodoListContainerDragOver" DragDrop.Drop="TodoListContainerDrop">
+                                                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+                                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                                <Border Classes="todo-list-handle" PointerPressed="TodoListHandlePointerPressed" PointerMoved="TodoListHandlePointerMoved" PointerReleased="TodoListHandlePointerReleased" ToolTip.Tip="拖动调整列表位置">
+                                                                    <TextBlock Text="⋮" FontSize="16" HorizontalAlignment="Center"/>
+                                                                </Border>
+                                                                <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay}" IsReadOnly="{Binding !IsEditingName}" LostFocus="TodoListNameLostFocus" BorderThickness="0" Background="Transparent" FontWeight="SemiBold" FontSize="14" MinWidth="120" Margin="5,0,0,0"/>
+                                                                <Button Grid.Column="2" Content="⋯" Padding="7,3" Background="Transparent" BorderThickness="0" FontSize="16" ToolTip.Tip="列表菜单">
+                                                                    <Button.Flyout>
+                                                                        <MenuFlyout>
+                                                                            <MenuItem Header="重命名列表" Click="TodoRenameListClick" IsEnabled="{Binding CanRename}" ToolTip.Tip="待确认列表不可修改名称"/>
+                                                                            <MenuItem Header="归档列表" Command="{Binding ArchiveCommand}" IsVisible="{Binding CanArchive}"/>
+                                                                            <MenuItem Header="恢复列表" Command="{Binding ArchiveCommand}" IsVisible="{Binding CanRestore}"/>
+                                                                            <MenuItem Header="删除列表" Command="{Binding DeleteCommand}" IsEnabled="{Binding CanDelete}" ToolTip.Tip="系统列表不可删除"/>
+                                                                        </MenuFlyout>
+                                                                    </Button.Flyout>
+                                                                </Button>
+                                                            </Grid>
+                                                            <TextBlock Grid.Row="1" Text="{Binding CardCountText}" Classes="muted"/>
+                                                            <ScrollViewer Grid.Row="2" MaxHeight="520" VerticalAlignment="Top" DragDrop.AllowDrop="True" DragDrop.DragOver="TodoListDragOver" DragDrop.Drop="TodoListDrop" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                                                <StackPanel>
+                                                                    <ItemsControl ItemsSource="{Binding Cards}">
+                                                                        <ItemsControl.ItemTemplate>
+                                                                            <DataTemplate x:DataType="vm:WorkItemViewModel">
+                                                                             <Border Classes="todo-card" DragDrop.AllowDrop="True" PointerPressed="TodoCardPointerPressed" PointerMoved="TodoCardPointerMoved" PointerReleased="TodoCardPointerReleased" DragDrop.DragOver="TodoCardDragOver" DragDrop.Drop="TodoCardDrop" ToolTip.Tip="拖拽调整顺序；编辑请使用更多操作">
+                                                                                <Grid>
+                                                                                    <StackPanel Spacing="7" Margin="0,0,34,0">
+                                                                                        <ItemsControl ItemsSource="{Binding LabelBadges}" IsVisible="{Binding HasLabels}">
+                                                                                            <ItemsControl.ItemsPanel>
+                                                                                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                                                                            </ItemsControl.ItemsPanel>
+                                                                                            <ItemsControl.ItemTemplate>
+                                                                                                <DataTemplate x:DataType="vm:TodoLabelBadgeViewModel">
+                                                                                                    <Border Classes="todo-card-tag" Background="{Binding BackgroundBrush}">
+                                                                                                        <TextBlock Text="{Binding Name}" Foreground="{Binding ForegroundBrush}" TextTrimming="CharacterEllipsis" />
+                                                                                                    </Border>
+                                                                                                </DataTemplate>
+                                                                                            </ItemsControl.ItemTemplate>
+                                                                                        </ItemsControl>
+                                                                                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" Foreground="#142033" TextWrapping="Wrap"/>
+                                                                                        <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Classes="muted" MaxHeight="40"/>
+                                                                                        <WrapPanel Orientation="Horizontal">
+                                                                                            <Border Classes="todo-card-meta" IsVisible="{Binding DueAtText, Converter={StaticResource StringToVisibilityConverter}}">
+                                                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                                                    <TextBlock Text="◷"/>
+                                                                                                    <TextBlock Text="{Binding DueAtText}"/>
+                                                                                                </StackPanel>
+                                                                                            </Border>
+                                                                                            <Border Classes="todo-card-meta" IsVisible="{Binding HasChecklist}">
+                                                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                                                    <TextBlock Text="✓"/>
+                                                                                                    <TextBlock Text="{Binding ChecklistSummary}"/>
+                                                                                                </StackPanel>
+                                                                                            </Border>
+                                                                                            <Border Classes="todo-card-meta">
+                                                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                                                    <TextBlock Text="⚑"/>
+                                                                                                    <TextBlock Text="{Binding Priority}"/>
+                                                                                                </StackPanel>
+                                                                                            </Border>
+                                                                                            <Border Classes="todo-card-meta" IsVisible="{Binding CompanyName, Converter={StaticResource StringToVisibilityConverter}}">
+                                                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                                                    <TextBlock Text="▣"/>
+                                                                                                    <TextBlock Text="{Binding CompanyName}" TextTrimming="CharacterEllipsis"/>
+                                                                                                </StackPanel>
+                                                                                            </Border>
+                                                                                        </WrapPanel>
+                                                                                    </StackPanel>
+                                                                                    <Button Classes="todo-card-more" Content="⋯" Padding="5,0" Background="Transparent" BorderThickness="0" FontSize="16" Click="TodoCardMoreClick" ToolTip.Tip="更多操作" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                                                                        <Button.Flyout>
+                                                                                            <MenuFlyout>
+                                                                                                <MenuItem Header="编辑详情" Command="{Binding EditCommand}"/>
+                                                                                                <MenuItem Header="{Binding ArchiveActionText}" Command="{Binding ArchiveCommand}"/>
+                                                                                                <MenuItem Header="删除" Command="{Binding DeleteCommand}"/>
+                                                                                            </MenuFlyout>
+                                                                                        </Button.Flyout>
+                                                                                    </Button>
+                                                                                </Grid>
+                                                                             </Border>
+                                                                            </DataTemplate>
+                                                                        </ItemsControl.ItemTemplate>
+                                                                    </ItemsControl>
+                                                                    <Button Content="+ 添加卡片" HorizontalAlignment="Left" Padding="4,6" Background="Transparent" BorderThickness="0" Foreground="#56657A" Command="{Binding AddCardCommand}"/>
+                                                                </StackPanel>
+                                                            </ScrollViewer>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Border Classes="todo-list" ToolTip.Tip="输入名称后按 Enter 或移开焦点即可创建列表">
+                                            <TextBox Text="{Binding NewTodoListName, Mode=TwoWay}" PlaceholderText="新列表名称" MinWidth="180" KeyDown="NewTodoListName_KeyDown" LostFocus="NewTodoListName_LostFocus"/>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="工作通知">
+                            <Grid RowDefinitions="Auto,*" RowSpacing="12" Margin="0,10,0,0">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                                    <StackPanel>
+                                        <TextBlock Text="工作通知" FontWeight="SemiBold" Foreground="#142033"/>
+                                        <TextBlock Text="仅显示未读通知或仍需操作的通知。完整历史请到通知中心查看。" Classes="muted" Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="查看全部通知" Command="{Binding NavigateToPageCommand}" CommandParameter="0" Padding="10,4" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Border Grid.Row="1" Classes="card" Padding="12">
+                                    <Grid>
+                                        <ScrollViewer IsVisible="{Binding HasWorkNotifications}" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding WorkNotifications}" ItemTemplate="{StaticResource NotificationItemTemplate}"/>
+                                        </ScrollViewer>
+                                        <TextBlock IsVisible="{Binding !HasWorkNotifications}" Text="当前没有待处理的工作通知。" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
                 <Grid IsVisible="{Binding IsWechatPageSelected}">
                     <Grid RowDefinitions="Auto,Auto,*">
                         <Border Classes="card" Margin="0,0,0,14"><Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"><StackPanel><TextBlock Text="分析任务" FontWeight="SemiBold" Foreground="#142033"/><TextBlock Text="Agent、白名单和分析内容可在设置中调整。" Classes="muted" Margin="0,8,0,0"/></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom"><Button Content="分析设置" Command="{Binding OpenWechatAnalysisSettingsCommand}"/><Button Content="设置最新分析点" Command="{Binding SetLatestAnalysisPointCommand}" ToolTip.Tip="跳过当前历史消息，从当前最新消息之后开始自动分析"/><Button Classes="accent" Content="分析最近会话" Command="{Binding AnalyzeWechatCommand}"/></StackPanel><TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="Provider、Model 和 Memory 由 QwenPaw Agent 管理，本地客户端不单独配置。" Classes="muted" Margin="0,12,0,0"/></Grid></Border>
@@ -389,7 +646,7 @@
                                     <Border Width="82" Height="82" CornerRadius="20" Background="#EAF3FF">
                                         <PathIcon Width="56" Height="56" Data="M10,7.5H22C23.38,7.5 24.5,8.62 24.5,10V22C24.5,23.38 23.38,24.5 22,24.5H10C8.62,24.5 7.5,23.38 7.5,22V10C7.5,8.62 8.62,7.5 10,7.5Z M14,10.8A2.2,2.2 0 1 0 14,15.2A2.2,2.2 0 1 0 14,10.8Z M10.5,20.5C10.95,18.35 12.1,17.25 14,17.25C15.9,17.25 17.05,18.35 17.5,20.5M19,12H22" Foreground="#2F7BF6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="联系人管理" FontSize="15" FontWeight="SemiBold" Foreground="#142033" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="联系人管理" FontSize="14" FontWeight="SemiBold" Foreground="#142033" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                             <Button Classes="app-tile" Command="{Binding OpenTodoListAppCommand}">
@@ -397,21 +654,21 @@
                                     <Border Width="82" Height="82" CornerRadius="20" Background="#FFF4E8">
                                         <PathIcon Width="56" Height="56" Data="M10,7.5H22C23.38,7.5 24.5,8.62 24.5,10V22C24.5,23.38 23.38,24.5 22,24.5H10C8.62,24.5 7.5,23.38 7.5,22V10C7.5,8.62 8.62,7.5 10,7.5Z M11,12.2L12.5,13.7L15,11.2M17.5,12.5H21M11,18.2L12.5,19.7L15,17.2M17.5,18.5H21" Foreground="#D8842B" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <TextBlock Text="Todo / 日报" FontSize="15" FontWeight="SemiBold" Foreground="#142033" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Todo / 日报" FontSize="14" FontWeight="SemiBold" Foreground="#142033" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
-                <Grid IsVisible="{Binding IsRemotePageSelected}"><Border Classes="card" VerticalAlignment="Top"><StackPanel><TextBlock Text="暂未开放" FontSize="18" Foreground="#6B778C"/><TextBlock Text="设备连接、远程控制和设备管理将在后续阶段实现。" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border></Grid>
+                <Grid IsVisible="{Binding IsRemotePageSelected}"><Border Classes="card" VerticalAlignment="Top"><StackPanel><TextBlock Text="暂未开放" FontSize="16" Foreground="#6B778C"/><TextBlock Text="设备连接、远程控制和设备管理将在后续阶段实现。" Classes="muted" Margin="0,8,0,0"/></StackPanel></Border></Grid>
                 <Grid IsVisible="{Binding IsSettingsPageSelected}">
-                    <ScrollViewer><StackPanel Spacing="14"><Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="QwenPaw 登录" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="服务器地址" Classes="muted"/><TextBox Text="{Binding ServerUrl}"/><TextBlock Text="用户名" Classes="muted"/><TextBox Text="{Binding Username}"/><TextBlock Text="密码" Classes="muted"/><TextBox Text="{Binding Password}" PasswordChar="●"/><Button Classes="accent" Content="登录并读取 Agent" Command="{Binding LoginCommand}" HorizontalAlignment="Left"/><TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
-                        <Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="启动设置" FontSize="18" FontWeight="SemiBold"/><CheckBox Content="开机启动 Fairy" IsChecked="{Binding IsStartupEnabled, Mode=TwoWay}"/><TextBlock Text="{Binding StartupStatusText}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
+                    <ScrollViewer><StackPanel Spacing="14"><Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="QwenPaw 登录" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="服务器地址" Classes="muted"/><TextBox Text="{Binding ServerUrl}"/><TextBlock Text="用户名" Classes="muted"/><TextBox Text="{Binding Username}"/><TextBlock Text="密码" Classes="muted"/><TextBox Text="{Binding Password}" PasswordChar="●"/><Button Classes="accent" Content="登录并读取 Agent" Command="{Binding LoginCommand}" HorizontalAlignment="Left"/><TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
+                        <Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="启动设置" FontSize="16" FontWeight="SemiBold"/><CheckBox Content="开机启动 Fairy" IsChecked="{Binding IsStartupEnabled, Mode=TwoWay}"/><TextBlock Text="{Binding StartupStatusText}" TextWrapping="Wrap" Classes="muted"/></StackPanel></Border>
                         <Border Classes="card">
                             <StackPanel Spacing="12">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <StackPanel>
-                                        <TextBlock Text="微信分析设置" FontSize="18" FontWeight="SemiBold"/>
+                                        <TextBlock Text="微信分析设置" FontSize="16" FontWeight="SemiBold"/>
                                         <TextBlock Text="控制自动分析的会话范围、分析内容和联系人白名单。" Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                     </StackPanel>
                                     <Button Grid.Column="1" Content="刷新联系人和公司" Command="{Binding RefreshWechatWhitelistCommand}" VerticalAlignment="Center"/>
@@ -465,7 +722,7 @@
                                 <Button Classes="accent" Content="保存微信分析设置" Command="{Binding SaveWechatAnalysisSettingsCommand}" HorizontalAlignment="Left"/>
                             </StackPanel>
                         </Border>
-                        <Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="时间设置" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="时区" Classes="muted"/><ComboBox ItemsSource="{Binding TimeZones}" SelectedItem="{Binding SelectedTimeZone, Mode=TwoWay}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:TimeZoneOption"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="14"><TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding OffsetText}" Classes="muted"/></Grid></DataTemplate></ComboBox.ItemTemplate></ComboBox><TextBlock Text="{Binding TimeZoneSummary}" Classes="muted"/><TextBlock Text="{Binding CurrentTimeText}" Classes="muted"/><TextBlock Text="通知、聊天数据以及其他界面时间均按此时区显示；数据存储仍使用统一时间基准。" Classes="muted" TextWrapping="Wrap"/></StackPanel></Border><Border Classes="card"><StackPanel Spacing="8"><TextBlock Text="第三方通知接口" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="接口地址" Classes="muted"/><TextBox Text="{Binding NotificationApiEndpoint}" IsReadOnly="True"/><TextBlock Text="开发 Token" Classes="muted"/><TextBox Text="{Binding NotificationApiToken}" IsReadOnly="True"/><TextBlock Text="仅监听 127.0.0.1，本地第三方程序可使用 Bearer Token 发送通知。" Classes="muted" TextWrapping="Wrap"/></StackPanel></Border></StackPanel></ScrollViewer>
+                         <Border Classes="card"><StackPanel Spacing="10"><TextBlock Text="时间设置" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="时区" Classes="muted"/><ComboBox ItemsSource="{Binding TimeZones}" SelectedItem="{Binding SelectedTimeZone, Mode=TwoWay}" HorizontalAlignment="Stretch"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:TimeZoneOption"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="14"><TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="1" Text="{Binding OffsetText}" Classes="muted"/></Grid></DataTemplate></ComboBox.ItemTemplate></ComboBox><TextBlock Text="{Binding TimeZoneSummary}" Classes="muted"/><TextBlock Text="{Binding CurrentTimeText}" Classes="muted"/><TextBlock Text="通知、聊天数据以及其他界面时间均按此时区显示；数据存储仍使用统一时间基准。" Classes="muted" TextWrapping="Wrap"/></StackPanel></Border><Border Classes="card"><StackPanel Spacing="8"><TextBlock Text="第三方通知接口" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="接口地址" Classes="muted"/><TextBox Text="{Binding NotificationApiEndpoint}" IsReadOnly="True"/><TextBlock Text="Bearer Token" Classes="muted"/><Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding NotificationApiToken}" IsReadOnly="True" PasswordChar="●" IsVisible="{Binding !IsNotificationApiTokenVisible}"/><TextBox Text="{Binding NotificationApiToken}" IsReadOnly="True" IsVisible="{Binding IsNotificationApiTokenVisible}"/><Button Grid.Column="1" Classes="icon-button" Command="{Binding ToggleNotificationApiTokenVisibilityCommand}" ToolTip.Tip="{Binding NotificationApiTokenVisibilityToolTip}" Padding="8"><Grid><Path Data="M2.5,12 C4.7,7.7 8.05,5.5 12,5.5 C15.95,5.5 19.3,7.7 21.5,12 C19.3,16.3 15.95,18.5 12,18.5 C8.05,18.5 4.7,16.3 2.5,12 Z M12,15.5 C13.93,15.5 15.5,13.93 15.5,12 C15.5,10.07 13.93,8.5 12,8.5 C10.07,8.5 8.5,10.07 8.5,12 C8.5,13.93 10.07,15.5 12,15.5 Z" Stroke="#4D5664" StrokeThickness="1.5" Fill="Transparent" IsVisible="{Binding !IsNotificationApiTokenVisible}" Width="20" Height="20"/><Path Data="M3.5,3.5 L20.5,20.5 M2.5,12 C4.7,7.7 8.05,5.5 12,5.5 C15.95,5.5 19.3,7.7 21.5,12 C19.3,16.3 15.95,18.5 12,18.5 C8.05,18.5 4.7,16.3 2.5,12 Z" Stroke="#4D5664" StrokeThickness="1.5" Fill="Transparent" IsVisible="{Binding IsNotificationApiTokenVisible}" Width="20" Height="20"/></Grid></Button></Grid><TextBlock Text="该 Bearer Token 就是当前接口实际使用的认证凭据；点击眼睛图标可显示或隐藏。默认监听本机所有网卡；局域网第三方程序需按文档配置 Windows 防火墙。" Classes="muted" TextWrapping="Wrap"/></StackPanel></Border></StackPanel></ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>
@@ -478,7 +735,7 @@
                     <Button Grid.Column="2" Content="关闭" Command="{Binding CloseNotificationSearchCommand}"/>
                 </Grid>
                 <Grid Grid.Row="1" ColumnDefinitions="*,44" ColumnSpacing="8" Margin="0,0,0,14">
-                    <TextBox Text="{Binding NotificationSearchKeyword, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索标题、正文、来源、分类或级别" FontSize="16" Padding="14,10">
+                    <TextBox Text="{Binding NotificationSearchKeyword, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="搜索标题、正文、来源、分类或级别" FontSize="12" Padding="8,3">
                         <TextBox.KeyBindings>
                             <KeyBinding Gesture="Enter" Command="{Binding SearchNotificationsCommand}"/>
                         </TextBox.KeyBindings>
@@ -490,5 +747,10 @@
                 <ListBox Grid.Row="2" SelectionChanged="NotificationSelectionChanged" ItemsSource="{Binding Notifications}" ItemTemplate="{StaticResource NotificationItemTemplate}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.ScrollChanged="NotificationScrollChanged" Background="Transparent" BorderThickness="0"/>
             </Grid>
         </Grid>
+        <Canvas x:Name="DragPreviewCanvas" Grid.ColumnSpan="2" IsHitTestVisible="False" ZIndex="100">
+            <Border x:Name="DragPreviewBorder" Width="280" IsVisible="False" Padding="14,10" Background="#F7FBFF" BorderBrush="#2F7BF6" BorderThickness="1.5" CornerRadius="10" Opacity="0.9">
+                <TextBlock x:Name="DragPreviewText" FontSize="14" FontWeight="SemiBold" Foreground="#142033" TextWrapping="Wrap" MaxHeight="44"/>
+            </Border>
+        </Canvas>
     </Grid>
 </Window>

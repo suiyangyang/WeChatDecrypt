@@ -45,6 +45,9 @@
 
   <ItemGroup>
     <None Include="Assets\fairy-shortcut.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="wechat-context.local.json"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Target Name="CopyBuiltInAppArtifacts" AfterTargets="Build">

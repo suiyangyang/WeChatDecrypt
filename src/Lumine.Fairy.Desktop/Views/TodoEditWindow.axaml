@@ -1,0 +1,311 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Lumine.Fairy.Desktop.ViewModels"
+        xmlns:protocol="using:Lumine.Fairy.Protocol"
+        x:Class="Lumine.Fairy.Desktop.Views.TodoEditWindow"
+        x:DataType="vm:TodoEditWindowViewModel"
+        Width="660"
+        Height="820"
+        MinWidth="580"
+        MinHeight="700"
+        Title="编辑 TODO"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        FontSize="12"
+        Background="#F7F9FC">
+  <Window.Styles>
+    <Style Selector="Border.todo-editor-section">
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#E2E8F0" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.todo-editor-section-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#142033" />
+    </Style>
+    <Style Selector="TextBlock.todo-editor-label">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#334155" />
+    </Style>
+    <Style Selector="TextBlock.todo-editor-caption">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="#718096" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.todo-editor-status">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#64748B" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.todo-editor-status.error">
+      <Setter Property="Foreground" Value="#B42318" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBox.todo-editor-input">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D5DCE7" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="ComboBox.todo-editor-select">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D5DCE7" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="DatePicker.todo-editor-date">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D5DCE7" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="CheckBox.todo-editor-check">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#475569" />
+    </Style>
+    <Style Selector="Button.todo-editor-secondary">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Background" Value="#FFFFFF" />
+      <Setter Property="BorderBrush" Value="#D5DCE7" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+    <Style Selector="Button.todo-editor-primary">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="12,4" />
+      <Setter Property="Background" Value="#1769D1" />
+      <Setter Property="BorderBrush" Value="#1769D1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+    <Style Selector="Border.todo-editor-tag">
+      <Setter Property="Background" Value="#000000" />
+      <Setter Property="BorderBrush" Value="#000000" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="7,5" />
+    </Style>
+    <Style Selector="TextBox.todo-editor-tag-input">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.todo-editor-tag-remove">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="#1769D1" />
+    </Style>
+    <Style Selector="Button.todo-editor-color">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="MinWidth" Value="22" />
+      <Setter Property="MinHeight" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="Border.todo-editor-item">
+      <Setter Property="Background" Value="#F8FAFC" />
+      <Setter Property="BorderBrush" Value="#E6EBF2" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto" Margin="20">
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="12">
+        <Border Classes="todo-editor-section">
+          <StackPanel Spacing="11">
+            <StackPanel Spacing="5">
+              <TextBlock Text="任务标题" Classes="todo-editor-label" />
+              <TextBox Classes="todo-editor-input" Text="{Binding Title, Mode=TwoWay}" PlaceholderText="例如：跟进客户报价" />
+            </StackPanel>
+            <StackPanel Spacing="5">
+                <TextBlock Text="任务描述" Classes="todo-editor-label" />
+              <TextBox Classes="todo-editor-input" Text="{Binding Summary, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="84" PlaceholderText="用一句话说明要完成什么" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+              <StackPanel Spacing="5">
+                <TextBlock Text="优先级" Classes="todo-editor-label" />
+                <ComboBox Classes="todo-editor-select" ItemsSource="{Binding PriorityOptions}" SelectedItem="{Binding Priority, Mode=TwoWay}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="5">
+                <TextBlock Text="截止日期" Classes="todo-editor-label" />
+                <DatePicker Classes="todo-editor-date" SelectedDate="{Binding DueDate, Mode=TwoWay}" />
+              </StackPanel>
+            </Grid>
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+              <StackPanel Spacing="5">
+                <TextBlock Text="负责人" Classes="todo-editor-label" />
+                <TextBox Classes="todo-editor-input" Text="{Binding Assignee, Mode=TwoWay}" PlaceholderText="可选" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Spacing="5">
+                <TextBlock Text="所属公司" Classes="todo-editor-label" />
+                <ComboBox Classes="todo-editor-select" ItemsSource="{Binding FilteredCompanyOptions}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" Text="{Binding CompanyFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" PlaceholderText="输入公司名称或拼音">
+                  <ComboBox.SelectionBoxItemTemplate>
+                    <DataTemplate x:DataType="vm:TodoCompanyOption">
+                      <TextBlock Text="{Binding Name}" FontSize="12" />
+                    </DataTemplate>
+                  </ComboBox.SelectionBoxItemTemplate>
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TodoCompanyOption">
+                      <TextBlock Text="{Binding Name}" FontSize="12" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Grid>
+            <CheckBox Classes="todo-editor-check" Content="已归档" IsChecked="{Binding IsArchived, Mode=TwoWay}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="todo-editor-section">
+          <StackPanel Spacing="11">
+            <StackPanel Spacing="2">
+              <TextBlock Text="整理信息" Classes="todo-editor-section-title" />
+              <TextBlock Text="用标签和清单拆解任务，方便后续在看板中追踪。" Classes="todo-editor-caption" />
+            </StackPanel>
+
+            <StackPanel Spacing="5">
+              <TextBlock Text="标签" Classes="todo-editor-label" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Classes="todo-editor-input" Text="{Binding NewLabelName, Mode=TwoWay}" PlaceholderText="输入标签名称" />
+                <Button Grid.Column="1" Classes="todo-editor-secondary" Content="添加标签" Command="{Binding AddLabelCommand}" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding Labels}" IsVisible="{Binding HasLabels}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TodoLabelEditorViewModel">
+                    <Border Classes="todo-editor-tag" Margin="0,0,0,6">
+                      <StackPanel Spacing="5">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                          <TextBox Classes="todo-editor-tag-input" Text="{Binding Name, Mode=TwoWay}" Foreground="{Binding ForegroundBrush}" MinWidth="28" />
+                          <Button Grid.Column="1" Classes="todo-editor-tag-remove" Content="×" Foreground="{Binding ForegroundBrush}" Command="{Binding RemoveCommand}" />
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <TextBlock Text="颜色" FontSize="11" Foreground="{Binding ForegroundBrush}" VerticalAlignment="Center" Margin="0,0,2,0" />
+                          <ItemsControl ItemsSource="{Binding ColorOptions}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:TodoLabelColorOptionViewModel">
+                                <Button Classes="todo-editor-color" Background="{Binding Brush}" BorderBrush="{Binding SelectionBorderBrush}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Name}">
+                                  <TextBlock Text="✓" IsVisible="{Binding IsSelected}" Foreground="White" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Spacing="5">
+              <TextBlock Text="Checklist" Classes="todo-editor-label" />
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Classes="todo-editor-input" Text="{Binding NewChecklistText, Mode=TwoWay}" PlaceholderText="输入清单项目" />
+                <Button Grid.Column="1" Classes="todo-editor-secondary" Content="添加项目" Command="{Binding AddChecklistItemCommand}" />
+              </Grid>
+              <ItemsControl ItemsSource="{Binding ChecklistItems}" IsVisible="{Binding HasChecklist}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TodoChecklistItemViewModel">
+                    <Border Classes="todo-editor-item">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7">
+                        <CheckBox IsChecked="{Binding IsCompleted, Mode=TwoWay}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" Text="{Binding Text, Mode=TwoWay}" FontSize="12" BorderThickness="0" Background="Transparent" Padding="0" VerticalContentAlignment="Center" />
+                        <Button Grid.Column="2" Content="删除" FontSize="11" Foreground="#B42318" Padding="5,2" Background="Transparent" BorderThickness="0" Command="{Binding RemoveCommand}" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="todo-editor-section">
+          <StackPanel Spacing="11">
+            <StackPanel Spacing="2">
+              <TextBlock Text="评论与来源" Classes="todo-editor-section-title" />
+              <TextBlock Text="补充协作信息，并保留任务的原始来源线索。" Classes="todo-editor-caption" />
+            </StackPanel>
+
+            <StackPanel Spacing="5">
+              <TextBlock Text="评论 / 备注" Classes="todo-editor-label" />
+              <ItemsControl ItemsSource="{Binding Comments}" IsVisible="{Binding HasComments}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="protocol:TodoComment">
+                    <Border Classes="todo-editor-item">
+                      <StackPanel Spacing="2">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding Author}" FontSize="12" FontWeight="SemiBold" Foreground="#334155" />
+                          <TextBlock Grid.Column="1" Text="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Classes="todo-editor-caption" />
+                        </Grid>
+                        <TextBlock Text="{Binding Text}" Classes="todo-editor-caption" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <TextBox Classes="todo-editor-input" Text="{Binding NewCommentText, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap" MinLines="4" MinHeight="88" VerticalContentAlignment="Top" PlaceholderText="输入评论或备注" />
+                <Button Grid.Column="1" Classes="todo-editor-secondary" Content="添加评论" Command="{Binding AddCommentCommand}" />
+              </Grid>
+            </StackPanel>
+
+            <Border Background="#F8FAFC" BorderBrush="#E6EBF2" BorderThickness="1" CornerRadius="8" Padding="10">
+              <StackPanel Spacing="3">
+                <TextBlock Text="任务来源" Classes="todo-editor-label" />
+                <TextBlock Text="{Binding SourceText}" Classes="todo-editor-caption" />
+                <TextBlock Text="{Binding ConversationText}" Classes="todo-editor-caption" />
+                <TextBlock Text="{Binding CreatedAtText}" Classes="todo-editor-caption" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="1" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Text="{Binding StatusText}" Classes="todo-editor-status" Classes.error="{Binding IsStatusError}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="todo-editor-secondary" Content="取消" Command="{Binding CancelCommand}" IsEnabled="{Binding !IsBusy}" />
+        <Button Grid.Column="2" Classes="todo-editor-primary" Content="保存" Command="{Binding SaveCommand}" IsEnabled="{Binding !IsBusy}" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
