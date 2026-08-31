@@ -10,12 +10,12 @@ public sealed class WeChatAnalysisCoordinator(
     IQwenPawClient qwenPaw,
     NotificationService notifications,
     TodoService todos,
-    Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? companyResolver = null)
+    Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? contextResolver = null)
 {
     private static readonly TimeSpan WeChatStageTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan QwenPawStageTimeout = TimeSpan.FromMinutes(11);
     private readonly TodoService _todos = todos;
-    private readonly Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? _companyResolver = companyResolver;
+    private readonly Func<ChatAccount, ChatSession, CancellationToken, Task<ConversationCompanyContext?>>? _contextResolver = contextResolver;
 
     public event EventHandler<AnalysisProgressSnapshot>? ProgressChanged;
     public WeChatAnalysisSettings Settings { get; set; } = new();
@@ -161,7 +161,24 @@ public sealed class WeChatAnalysisCoordinator(
         progress.Complete("qwen-send", "分析请求已提交");
         progress.Start("qwen-analyze", "QwenPaw 正在理解消息并生成结构化结果");
 
-        var prompt = BuildPrompt(account, session, messages, Settings);
+        ConversationCompanyContext? analysisContext = null;
+        if (_contextResolver is not null)
+        {
+            try
+            {
+                analysisContext = await _contextResolver(account, session, cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                progress.Start("qwen-analyze", "本地业务上下文查询超时，继续分析聊天内容");
+            }
+            catch (Exception ex)
+            {
+                // Context is an accuracy aid, not a prerequisite for analysis.
+                progress.Start("qwen-analyze", $"本地业务上下文不可用，继续分析聊天内容：{ex.Message}");
+            }
+        }
+        var prompt = BuildPrompt(account, session, messages, Settings, analysisContext);
         var result = await RunStageAsync(
             progress,
             "qwen-analyze",
@@ -189,18 +206,18 @@ public sealed class WeChatAnalysisCoordinator(
         progress.Start("persist", "正在保存 TODO 候选、通知和分析结果");
         try
         {
-            var companyContext = _companyResolver is null
-                ? null
-                : await _companyResolver(account, session, cancellationToken);
-
             if (Allows(WeChatAnalysisContentType.Todo))
             foreach (var todo in analysis.Todos ?? Array.Empty<TodoCandidate>())
             {
             var todoId = BuildTodoId(account, session, todo);
+            var title = string.IsNullOrWhiteSpace(todo.Title) ? "微信工作事项" : todo.Title.Trim();
+            var summary = string.IsNullOrWhiteSpace(todo.Summary)
+                ? "请查看关联微信消息，补充具体工作内容。"
+                : todo.Summary.Trim();
             var candidate = new TodoRecord(
                 todoId,
-                string.IsNullOrWhiteSpace(todo.Title) ? "微信工作事项" : todo.Title.Trim(),
-                todo.Summary?.Trim() ?? string.Empty,
+                title,
+                summary,
                 string.IsNullOrWhiteSpace(todo.Priority) ? "medium" : todo.Priority.Trim(),
                 todo.DueAt,
                 todo.Assignee,
@@ -212,10 +229,12 @@ public sealed class WeChatAnalysisCoordinator(
                 null,
                 "wechat-analysis",
                 session.Username,
-                companyContext?.CompanyId,
-                companyContext?.CompanyName,
+                analysisContext?.CompanyId,
+                analysisContext?.CompanyName,
                 session.DisplayName,
-                session.IsGroupConversation);
+                session.IsGroupConversation,
+                BoardId: "default",
+                ListId: "pending-confirmation");
             var stored = await _todos.EnsureCandidateAsync(candidate, cancellationToken);
             if (stored is null || !stored.Status.Equals("pending_confirmation", StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -395,7 +414,12 @@ public sealed class WeChatAnalysisCoordinator(
         }
     }
 
-    private string BuildPrompt(ChatAccount account, ChatSession session, IReadOnlyList<ChatMessage> messages, WeChatAnalysisSettings settings)
+    private string BuildPrompt(
+        ChatAccount account,
+        ChatSession session,
+        IReadOnlyList<ChatMessage> messages,
+        WeChatAnalysisSettings settings,
+        ConversationCompanyContext? analysisContext)
     {
         var builder = new StringBuilder();
         var contentTypes = settings.ContentTypes.Count == 0
@@ -406,9 +430,30 @@ public sealed class WeChatAnalysisCoordinator(
         if (contentTypes.Contains(WeChatAnalysisContentType.CustomerQuestion))
             builder.AppendLine("客户提问仅指客户在消息中@我并提出问题，且我在该问题后 10 分钟内没有给出回复；请据此识别并生成 clarification question。");
         builder.AppendLine("最终只返回一个合法 JSON 对象，不要返回 Markdown 代码块、解释文字或推理过程。JSON 必须包含 decision、todos、intents、questions、sourceRefs 五个字段；没有结果时使用空数组，并将 decision 设为 no_action。只输出 ToDo 和客户提问，未选择的类型必须返回空数组。");
+        builder.AppendLine("todos 非空时，每个工作事项必须严格包含 id、title、summary、priority、dueAt、assignee、confidence、sourceRefs 字段。id、title、summary、priority 不得为 null 或空字符串；summary 必须用一至两句话说明具体要做什么、与当前聊天的关系及预期结果，禁止只重复标题。priority 只能是 low、medium 或 high；dueAt 和 assignee 未知时写 null；confidence 为 0 至 1 的数值；sourceRefs 至少包含一个下方聊天消息 ID。无法生成完整工作事项时返回 todos: []，禁止返回 [{}] 或缺少 summary 的对象。");
+        builder.AppendLine("todos 项示例：{\"id\":\"todo-1\",\"title\":\"确认交付时间\",\"summary\":\"根据客户询问，确认当前排期并在今天回复可交付日期。回复后将结果同步给项目负责人。\",\"priority\":\"medium\",\"dueAt\":null,\"assignee\":null,\"confidence\":0.9,\"sourceRefs\":[\"message-id\"]}");
+        builder.AppendLine("所有 JSON 字段必须使用 camelCase，禁止使用 snake_case。questions 非空时，每个问题必须严格包含 id、problem、source、solutions、recommendedSolutionId、allowCustomInput 字段；id、problem、source、solutions、recommendedSolutionId 不得为 null 或空字符串。source 必须包含 conversationId、participants、from、to、messageRefs；solutions 至少包含两个方案，每个方案必须包含 id、label、instruction、recommended，并且只能有一个 recommended 为 true。recommendedSolutionId 必须等于推荐方案的 id。无法生成完整问题时返回 questions: []，禁止返回 [{}] 或字段不完整的问题对象。");
+        builder.AppendLine("questions 项示例：{\"id\":\"q-1\",\"problem\":\"需要确认的问题\",\"source\":{\"conversationId\":\"conversation-id\",\"participants\":[\"甲\",\"乙\"],\"from\":\"甲\",\"to\":\"乙\",\"messageRefs\":[\"message-id\"]},\"solutions\":[{\"id\":\"s1\",\"label\":\"方案一\",\"instruction\":\"执行方案一\",\"recommended\":true},{\"id\":\"s2\",\"label\":\"方案二\",\"instruction\":\"执行方案二\",\"recommended\":false}],\"recommendedSolutionId\":\"s1\",\"allowCustomInput\":true}");
         builder.AppendLine("每个 sourceRefs 必须使用下面消息中的消息 ID；不要编造消息 ID。");
         builder.AppendLine($"账号：{account.DisplayName}");
         builder.AppendLine($"会话：{session.DisplayName}");
+        builder.AppendLine("本地业务上下文（仅作辅助依据；聊天事实优先；未提供的字段不得猜测）：");
+        if (analysisContext is null)
+        {
+            builder.AppendLine("- 未找到本地联系人、公司或项目映射。");
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(analysisContext.ContactName))
+                builder.AppendLine($"- 联系人：{analysisContext.ContactName}");
+            if (!string.IsNullOrWhiteSpace(analysisContext.CompanyName))
+                builder.AppendLine($"- 公司：{analysisContext.CompanyName}");
+            if (!string.IsNullOrWhiteSpace(analysisContext.ProjectName))
+                builder.AppendLine($"- 项目：{analysisContext.ProjectName}");
+            if (analysisContext.ProjectTags is { Count: > 0 })
+                builder.AppendLine($"- 项目标签：{string.Join("、", analysisContext.ProjectTags)}");
+            builder.AppendLine($"- 匹配方式：{analysisContext.MatchMethod ?? "本地目录匹配"}");
+        }
         builder.AppendLine("聊天内容：");
         foreach (var message in messages)
             builder.AppendLine($"[{message.Id}] {message.Sender}: {message.Content}");

@@ -1,0 +1,6 @@
+{
+  "host": "192.168.1.20",
+  "port": 18766,
+  "token": "replace-with-shared-token",
+  "timeoutSeconds": 10
+}

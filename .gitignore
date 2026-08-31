@@ -366,3 +366,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Lumine.Fairy
+# Local-only WeChat context MCP settings contain the LAN token.
+src/Lumine.Fairy.Desktop/wechat-context.local.json
+tools/lumine-fairy-wechat-context-mcp/wechat-context.local.json

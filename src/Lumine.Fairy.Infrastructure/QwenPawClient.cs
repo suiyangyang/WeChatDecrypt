@@ -347,12 +347,7 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
                 var analysis = JsonSerializer.Deserialize<AnalysisResult>(
                     text[start..(end + 1)],
                     new JsonSerializerOptions(JsonSerializerDefaults.Web));
-                if (analysis is not null
-                    && !string.IsNullOrWhiteSpace(analysis.Decision)
-                    && analysis.Todos is not null
-                    && analysis.Intents is not null
-                    && analysis.Questions is not null
-                    && analysis.SourceRefs is not null)
+                if (analysis is not null && IsValidAnalysis(analysis))
                     return analysis;
             }
             catch (JsonException)
@@ -363,6 +358,66 @@ public sealed class QwenPawClient(IProtectedTokenStore tokenStore) : IQwenPawCli
 
         return null;
     }
+
+    private static bool IsValidAnalysis(AnalysisResult analysis)
+        => !string.IsNullOrWhiteSpace(analysis.Decision)
+           && analysis.Todos is not null
+           && analysis.Intents is not null
+           && analysis.Questions is not null
+           && analysis.SourceRefs is not null
+           && analysis.Todos.All(IsValidTodo)
+           && analysis.Questions.All(IsValidQuestion);
+
+    private static bool IsValidTodo(TodoCandidate? todo)
+        => todo is not null
+           && !string.IsNullOrWhiteSpace(todo.Id)
+           && !string.IsNullOrWhiteSpace(todo.Title)
+           && !string.IsNullOrWhiteSpace(todo.Summary)
+           && IsValidTodoPriority(todo.Priority)
+           && todo.Confidence is >= 0 and <= 1
+           && todo.SourceRefs is { Count: > 0 }
+           && todo.SourceRefs.All(reference => !string.IsNullOrWhiteSpace(reference));
+
+    private static bool IsValidTodoPriority(string? priority)
+        => priority?.Trim().ToLowerInvariant() is "low" or "medium" or "high";
+
+    private static bool IsValidQuestion(ClarificationQuestion? question)
+    {
+        if (question is null
+            || string.IsNullOrWhiteSpace(question.Id)
+            || string.IsNullOrWhiteSpace(question.Problem)
+            || string.IsNullOrWhiteSpace(question.RecommendedSolutionId)
+            || question.Source is null)
+            return false;
+
+        var source = question.Source;
+        if (string.IsNullOrWhiteSpace(source.ConversationId)
+            || string.IsNullOrWhiteSpace(source.From)
+            || string.IsNullOrWhiteSpace(source.To)
+            || source.Participants is not { Count: > 0 }
+            || source.MessageRefs is not { Count: > 0 }
+            || source.Participants.Any(string.IsNullOrWhiteSpace)
+            || source.MessageRefs.Any(string.IsNullOrWhiteSpace))
+            return false;
+
+        var solutions = question.Solutions;
+        if (solutions is not { Count: >= 2 }
+            || solutions.Any(solution => !IsValidSolution(solution)))
+            return false;
+
+        var recommendedSolutions = solutions.Where(solution => solution.Recommended).ToArray();
+        return recommendedSolutions.Length == 1
+               && string.Equals(
+                   question.RecommendedSolutionId,
+                   recommendedSolutions[0].Id,
+                   StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsValidSolution(QuestionSolution? solution)
+        => solution is not null
+           && !string.IsNullOrWhiteSpace(solution.Id)
+           && !string.IsNullOrWhiteSpace(solution.Label)
+           && !string.IsNullOrWhiteSpace(solution.Instruction);
 
     private static int FindBalancedJsonEnd(string text, int start)
     {

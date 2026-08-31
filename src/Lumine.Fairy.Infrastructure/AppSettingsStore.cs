@@ -7,6 +7,7 @@ namespace Lumine.Fairy.Infrastructure;
 public sealed class AppSettings
 {
     public string TimeZoneId { get; set; } = TimeZoneContext.DefaultTimeZoneId;
+    public string? WeChatAnalysisAgentId { get; set; }
     public WeChatAnalysisSettings WeChatAnalysis { get; set; } = new();
 
     public AppSettings() { }

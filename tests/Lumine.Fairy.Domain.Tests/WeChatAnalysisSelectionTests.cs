@@ -111,4 +111,61 @@ public sealed class WeChatAnalysisSelectionTests
 
         Assert.Null(analysis);
     }
+
+    [Fact]
+    public void QwenPawAnalysisParserRejectsQuestionWithMissingNestedFields()
+    {
+        const string response = "{\"decision\":\"question\",\"todos\":[],\"intents\":[],"
+            + "\"questions\":[{}],\"sourceRefs\":[]}";
+
+        var analysis = QwenPawClient.TryParseAnalysis(response);
+
+        Assert.Null(analysis);
+    }
+
+    [Fact]
+    public void QwenPawAnalysisParserRejectsTodoWithMissingSummary()
+    {
+        const string response = "{\"decision\":\"todo\",\"todos\":[{\"id\":\"todo-1\",\"title\":\"确认交付时间\","
+            + "\"priority\":\"medium\",\"dueAt\":null,\"assignee\":null,\"confidence\":0.9,\"sourceRefs\":[\"message-1\"]}],"
+            + "\"intents\":[],\"questions\":[],\"sourceRefs\":[]}";
+
+        var analysis = QwenPawClient.TryParseAnalysis(response);
+
+        Assert.Null(analysis);
+    }
+
+    [Fact]
+    public void QwenPawAnalysisParserAcceptsTodoWithDescription()
+    {
+        const string response = "{\"decision\":\"todo\",\"todos\":[{\"id\":\"todo-1\",\"title\":\"确认交付时间\","
+            + "\"summary\":\"确认当前排期并回复客户可交付日期。\",\"priority\":\"medium\",\"dueAt\":null,"
+            + "\"assignee\":null,\"confidence\":0.9,\"sourceRefs\":[\"message-1\"]}],\"intents\":[],"
+            + "\"questions\":[],\"sourceRefs\":[]}";
+
+        var analysis = QwenPawClient.TryParseAnalysis(response);
+
+        Assert.NotNull(analysis);
+        var todo = Assert.Single(analysis!.Todos);
+        Assert.Equal("确认当前排期并回复客户可交付日期。", todo.Summary);
+    }
+
+    [Fact]
+    public void QwenPawAnalysisParserAcceptsCompleteQuestionContract()
+    {
+        const string response = "{\"decision\":\"question\",\"todos\":[],\"intents\":[],"
+            + "\"questions\":[{\"id\":\"q-1\",\"problem\":\"需要确认的问题\","
+            + "\"source\":{\"conversationId\":\"conversation-1\",\"participants\":[\"甲\",\"乙\"],"
+            + "\"from\":\"甲\",\"to\":\"乙\",\"messageRefs\":[\"message-1\"]},"
+            + "\"solutions\":[{\"id\":\"s1\",\"label\":\"方案一\",\"instruction\":\"执行方案一\",\"recommended\":true},"
+            + "{\"id\":\"s2\",\"label\":\"方案二\",\"instruction\":\"执行方案二\",\"recommended\":false}],"
+            + "\"recommendedSolutionId\":\"s1\",\"allowCustomInput\":true}],\"sourceRefs\":[]}";
+
+        var analysis = QwenPawClient.TryParseAnalysis(response);
+
+        Assert.NotNull(analysis);
+        var question = Assert.Single(analysis!.Questions);
+        Assert.Equal("q-1", question.Id);
+        Assert.Equal("s1", question.RecommendedSolutionId);
+    }
 }
