@@ -320,6 +320,16 @@ public partial class MainWindow : Window
         await viewModel.AddTodoListCommand.ExecuteAsync(null);
     }
 
+    private async void TodoAddCardClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not AvaloniaControl button
+            || button.DataContext is not TodoListViewModel list)
+            return;
+
+        e.Handled = true;
+        await list.AddCardCommand.ExecuteAsync(null);
+    }
+
     private void TodoRenameListClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is not Avalonia.Controls.MenuItem menuItem

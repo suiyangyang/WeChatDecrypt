@@ -146,6 +146,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     private IReadOnlyList<TodoRecord> _allWorkItems = [];
     private IReadOnlyList<TodoListRecord> _allTodoLists = [];
     private TodoBoardRecord _todoBoard = new("default", "工作看板", "#1769D1");
+    private bool _isTodoEditorOpen;
 
     public MainWindowViewModel()
     {
@@ -783,7 +784,25 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private async Task ShowTodoEditorAsync(TodoRecord todo, bool isNew)
     {
-        if (IsBusy) return;
+        if (_isTodoEditorOpen) return;
+
+        _isTodoEditorOpen = true;
+        try
+        {
+            await ShowTodoEditorCoreAsync(todo, isNew);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"打开 TODO 编辑器失败：{ex.Message}";
+        }
+        finally
+        {
+            _isTodoEditorOpen = false;
+        }
+    }
+
+    private async Task ShowTodoEditorCoreAsync(TodoRecord todo, bool isNew)
+    {
 
         var owner = (Avalonia.Application.Current?.ApplicationLifetime
                      as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow;

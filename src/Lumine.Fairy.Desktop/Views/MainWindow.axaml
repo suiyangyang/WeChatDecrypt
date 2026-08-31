@@ -554,7 +554,7 @@
                                                                             </DataTemplate>
                                                                         </ItemsControl.ItemTemplate>
                                                                     </ItemsControl>
-                                                                    <Button Content="+ 添加卡片" HorizontalAlignment="Left" Padding="4,6" Background="Transparent" BorderThickness="0" Foreground="#56657A" Command="{Binding AddCardCommand}"/>
+                                                                    <Button Content="+ 添加卡片" HorizontalAlignment="Left" Padding="4,6" Background="Transparent" BorderThickness="0" Foreground="#56657A" Click="TodoAddCardClick"/>
                                                                 </StackPanel>
                                                             </ScrollViewer>
                                                         </Grid>
