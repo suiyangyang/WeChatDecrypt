@@ -46,8 +46,8 @@
       <Setter Property="Foreground" Value="#1D4ED8" />
     </Style>
     <Style Selector="Button.report-browse-chip">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="10,4" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Background" Value="#F8FAFC" />
       <Setter Property="BorderBrush" Value="#CBD5E1" />
@@ -69,12 +69,12 @@
     <Style Selector="Button.report-browse-icon">
       <Setter Property="Width" Value="36" />
       <Setter Property="MinWidth" Value="36" />
-      <Setter Property="Height" Value="34" />
+      <Setter Property="Height" Value="30" />
       <Setter Property="Padding" Value="0" />
     </Style>
     <Style Selector="Button.report-browse-action">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="10,4" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Background" Value="#FFFFFF" />
       <Setter Property="BorderBrush" Value="#D1D5DB" />
@@ -89,8 +89,8 @@
       <Setter Property="Foreground" Value="#1E293B" />
     </Style>
     <Style Selector="Button.report-browse-inline">
-      <Setter Property="MinHeight" Value="36" />
-      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="10,4" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Background" Value="#F8FAFC" />
       <Setter Property="BorderBrush" Value="#D1D5DB" />
@@ -105,8 +105,8 @@
       <Setter Property="Foreground" Value="#1D4ED8" />
     </Style>
     <Style Selector="TextBox.report-browse-search">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,6,38,6" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,3,34,3" />
       <Setter Property="Background" Value="#FFFFFF" />
       <Setter Property="BorderBrush" Value="#D1D5DB" />
       <Setter Property="BorderThickness" Value="1" />
@@ -373,43 +373,101 @@
           <StackPanel Spacing="8">
             <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
               <StackPanel Spacing="8">
-                <StackPanel Spacing="2">
-                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding TodayTodoTitle}" />
-                  <TextBlock FontSize="11" Foreground="#6B7280" Text="可直接微调项目、内容、状态、工时。" />
-                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                  <StackPanel Spacing="2">
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="任务看板" />
+                    <TextBlock FontSize="11" Foreground="#6B7280" Text="按状态管理全部未归档 Todo；日报编辑仍保留在下方。" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                    <Button Content="日报模板" Command="{Binding AddDailyReportTemplateCommand}" Padding="10,7" />
+                    <Button Content="客户模板" Command="{Binding AddClientFollowUpTemplateCommand}" Padding="10,7" />
+                    <Button Content="＋ 新建 Todo" Command="{Binding AddTodoCommand}" Padding="14,7" Background="#2563EB" Foreground="White" BorderBrush="#2563EB" BorderThickness="1" CornerRadius="8" />
+                  </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" ColumnSpacing="7">
+                  <TextBox Watermark="搜索任务、项目、备注或来源" Text="{Binding TodoSearchText}" MinHeight="28" Padding="8,3" />
+                  <ComboBox Grid.Column="1" Width="92" ItemsSource="{Binding TodoStatusFilterOptions}" SelectedItem="{Binding SelectedTodoStatusFilter}" />
+                  <ComboBox Grid.Column="2" Width="82" ItemsSource="{Binding TodoPriorityFilterOptions}" SelectedItem="{Binding SelectedTodoPriorityFilter}" />
+                  <ComboBox Grid.Column="3" Width="92" ItemsSource="{Binding TodoDateFilterOptions}" SelectedItem="{Binding SelectedTodoDateFilter}" />
+                  <Button Grid.Column="4" Content="清除" Command="{Binding ClearTodoSearchCommand}" Padding="10,5" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <TextBlock FontSize="11" Foreground="#64748B" Text="可拖拽式看板布局的轻量版：先用状态选择和上下排序快速整理。" TextWrapping="Wrap" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding TodoSummaryText}" VerticalAlignment="Center" />
+                    <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding TodoSaveStateText}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
                 <Border IsVisible="{Binding HasMissingDailyWorkHours}" Padding="8,6" CornerRadius="8" Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1">
                   <TextBlock FontSize="11" Foreground="#92400E" Text="{Binding MissingDailyWorkHoursHintText}" TextWrapping="Wrap" />
                 </Border>
-                <ItemsControl ItemsSource="{Binding DailyTodoEntries}" IsVisible="{Binding HasDailyTodoEntries}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:TodoEntryItemViewModel">
-                      <Border Margin="0,0,0,6" Padding="8" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1">
-                        <Grid ColumnDefinitions="1.1*,1.8*,130,88" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="8">
-                          <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
-                                    IsEditable="True"
-                                    Text="{Binding ProjectName}"
-                                    GotFocus="ProjectNameEditor_GotFocus"
-                                    Loaded="TodoProjectNameEditor_Loaded" />
-                          <TextBox Grid.Column="1" Watermark="内容" Text="{Binding Content}" />
-                          <ComboBox Grid.Column="2" ItemsSource="{Binding #RootWindow.DataContext.TodoStatusOptions}" SelectedItem="{Binding Status}" />
-                          <TextBox Grid.Column="3" Watermark="工时" Text="{Binding WorkHoursText}" />
-                          <TextBox Grid.Row="1" Grid.ColumnSpan="3" Watermark="标题 / 备注" Text="{Binding Title}" />
-                          <CheckBox Grid.Row="1" Grid.Column="3" HorizontalAlignment="Right" VerticalAlignment="Center" Content="日报项" IsChecked="{Binding IsDaily}" />
-                        </Grid>
-                      </Border>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Border IsVisible="{Binding !HasDailyTodoEntries}" Padding="8" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1">
-                  <TextBlock FontSize="11" Foreground="#64748B" Text="当前没有识别到今日 Todo，可继续输入随手记或点击“解析并归置”。" TextWrapping="Wrap" />
-                </Border>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                  <ItemsControl ItemsSource="{Binding TodoBoardColumns}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="8" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TodoBoardColumnViewModel">
+                        <Border Width="238" Padding="8" CornerRadius="10" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" DragDrop.AllowDrop="True" DragDrop.DragOver="TodoBoardColumnDragOver" DragDrop.Drop="TodoBoardColumnDrop">
+                          <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                              <Border Grid.Column="1" Padding="6,1" CornerRadius="999" Background="#E2E8F0">
+                                <TextBlock FontSize="11" Foreground="#475569" Text="{Binding CountText}" />
+                              </Border>
+                            </Grid>
+                            <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:TodoEntryItemViewModel">
+                                  <Border Margin="0,0,0,7" Padding="9" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1" DragDrop.AllowDrop="True" PointerPressed="TodoCardPointerPressed" PointerMoved="TodoCardPointerMoved" PointerReleased="TodoCardPointerReleased" DragDrop.DragOver="TodoCardDragOver" DragDrop.Drop="TodoCardDrop" ToolTip.Tip="拖动调整顺序，点击标题编辑详情">
+                                    <StackPanel Spacing="6">
+                                      <Button Content="{Binding DisplayTitle}" Command="{Binding #RootWindow.DataContext.OpenTodoDetailCommand}" CommandParameter="{Binding .}" HorizontalContentAlignment="Left" Padding="0" Background="Transparent" BorderBrush="Transparent" FontWeight="SemiBold" />
+                                      <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding ProjectName}" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock FontSize="11" Foreground="#475569" Text="{Binding Content}" TextWrapping="Wrap" MaxHeight="38" />
+                                      <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Border Padding="5,2" CornerRadius="4" Background="#FEF3C7" IsVisible="{Binding IsOverdue}">
+                                          <TextBlock FontSize="11" Foreground="#92400E" Text="逾期" />
+                                        </Border>
+                                        <Border Padding="5,2" CornerRadius="4" Background="#DBEAFE">
+                                          <TextBlock FontSize="11" Foreground="#1D4ED8" Text="{Binding PriorityText}" />
+                                        </Border>
+                                        <TextBlock FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Text="{Binding DueDateText}" IsVisible="{Binding HasDueDate}" />
+                                        <TextBlock FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Text="清单" IsVisible="{Binding HasChecklist}" />
+                                        <TextBlock FontSize="11" Foreground="#64748B" VerticalAlignment="Center" Text="{Binding ChecklistProgressText}" IsVisible="{Binding HasChecklist}" />
+                                      </StackPanel>
+                                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="5">
+                                        <Button Content="完成" Command="{Binding #RootWindow.DataContext.CompleteTodoCommand}" CommandParameter="{Binding .}" Padding="6,3" FontSize="11" IsVisible="{Binding CanComplete}" />
+                                        <Button Grid.Column="1" Content="归档" Command="{Binding #RootWindow.DataContext.ArchiveTodoCommand}" CommandParameter="{Binding .}" Padding="6,3" FontSize="11" />
+                                        <Button Grid.Column="2" Content="删除" Command="{Binding #RootWindow.DataContext.DeleteTodoCommand}" CommandParameter="{Binding .}" Padding="6,3" FontSize="11" Foreground="#B91C1C" />
+                                      </Grid>
+                                      <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="5">
+                                        <TextBlock VerticalAlignment="Center" FontSize="11" Foreground="#64748B" Text="状态" />
+                                        <ComboBox Grid.Column="1" Width="88" ItemsSource="{Binding #RootWindow.DataContext.TodoStatusOptions}" SelectedItem="{Binding Status}" FontSize="11" />
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+                                          <Button Content="↑" Command="{Binding #RootWindow.DataContext.MoveTodoUpCommand}" CommandParameter="{Binding .}" Padding="5,2" FontSize="11" />
+                                          <Button Content="↓" Command="{Binding #RootWindow.DataContext.MoveTodoDownCommand}" CommandParameter="{Binding .}" Padding="5,2" FontSize="11" />
+                                        </StackPanel>
+                                      </Grid>
+                                    </StackPanel>
+                                  </Border>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
               </StackPanel>
             </Border>
 
             <Border Padding="16" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10" IsVisible="False">
               <StackPanel Spacing="12">
                 <StackPanel Spacing="4">
-                  <TextBlock FontSize="18" FontWeight="SemiBold" Text="客户问题" />
+                  <TextBlock FontSize="16" FontWeight="SemiBold" Text="客户问题" />
                   <TextBlock Foreground="#6B7280" Text="按客户 / 项目块展示，不包含工时输入。" />
                 </StackPanel>
                 <ItemsControl ItemsSource="{Binding ClientIssueEntries}" IsVisible="{Binding HasClientIssues}">
@@ -446,7 +504,7 @@
 
             <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
               <StackPanel Spacing="8">
-                <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报预览" />
+                <TextBlock FontSize="14" FontWeight="SemiBold" Text="日报预览" />
                 <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="84" Text="{Binding FormattedDailyReportText}" />
                 <StackPanel Spacing="6" IsVisible="False">
                   <TextBlock FontWeight="SemiBold" Text="未归类片段" />
@@ -478,7 +536,7 @@
             <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
               <StackPanel Spacing="8">
                 <StackPanel Spacing="2">
-                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报浏览" />
+                  <TextBlock FontSize="14" FontWeight="SemiBold" Text="日报浏览" />
                   <TextBlock FontSize="11" Foreground="#6B7280" Text="按选中日期查看近 7 天或近 31 天日报，并可跳回当天原始随手记。" TextWrapping="Wrap" />
                 </StackPanel>
                 <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
@@ -643,7 +701,7 @@
               <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
                 <StackPanel Spacing="8">
                   <StackPanel Spacing="2">
-                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding TodayTodoTitle}" />
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding TodayTodoTitle}" />
                     <TextBlock FontSize="11" Foreground="#6B7280" Text="可直接微调项目、内容、状态、工时。" />
                   </StackPanel>
                   <Border IsVisible="{Binding HasMissingDailyWorkHours}" Padding="8,6" CornerRadius="8" Background="#FEF3C7" BorderBrush="#F59E0B" BorderThickness="1">
@@ -678,7 +736,7 @@
               <Border Padding="16" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10" IsVisible="False">
                 <StackPanel Spacing="12">
                   <StackPanel Spacing="4">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="客户问题" />
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="客户问题" />
                     <TextBlock Foreground="#6B7280" Text="按客户 / 项目块展示，不包含工时输入。" />
                   </StackPanel>
                   <ItemsControl ItemsSource="{Binding ClientIssueEntries}" IsVisible="{Binding HasClientIssues}">
@@ -715,7 +773,7 @@
 
               <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
                 <StackPanel Spacing="8">
-                  <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报预览" />
+                  <TextBlock FontSize="14" FontWeight="SemiBold" Text="日报预览" />
                   <TextBox AcceptsReturn="True" TextWrapping="Wrap" IsReadOnly="True" MinHeight="84" Text="{Binding FormattedDailyReportText}" />
                   <StackPanel Spacing="6" IsVisible="False">
                     <TextBlock FontWeight="SemiBold" Text="未归类片段" />
@@ -747,7 +805,7 @@
               <Border Padding="10" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
                 <StackPanel Spacing="8">
                   <StackPanel Spacing="2">
-                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="日报浏览" />
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="日报浏览" />
                     <TextBlock FontSize="11" Foreground="#6B7280" Text="按选中日期查看近 7 天或近 31 天日报，并可跳回当天原始随手记。" TextWrapping="Wrap" />
                   </StackPanel>
                   <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">

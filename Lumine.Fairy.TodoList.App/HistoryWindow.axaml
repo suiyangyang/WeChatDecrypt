@@ -17,7 +17,7 @@
 			<Setter Property="BorderBrush" Value="#D1D5DB" />
 			<Setter Property="BorderThickness" Value="1" />
 			<Setter Property="Background" Value="#FFFFFF" />
-			<Setter Property="Height" Value="30" />
+			<Setter Property="Height" Value="28" />
 			<Setter Property="VerticalContentAlignment" Value="Center" />
 			<Setter Property="CornerRadius" Value="15" />
 		</Style>
@@ -26,7 +26,7 @@
 			<Setter Property="BorderBrush" Value="#D1D5DB" />
 			<Setter Property="BorderThickness" Value="1" />
 			<Setter Property="Background" Value="#FFFFFF" />
-			<Setter Property="Height" Value="30" />
+			<Setter Property="Height" Value="28" />
 			<Setter Property="MinWidth" Value="128" />
 			<Setter Property="CornerRadius" Value="8" />
 		</Style>
@@ -37,8 +37,8 @@
 			<Setter Property="Foreground" Value="#334155" />
 			<Setter Property="Padding" Value="0" />
 			<Setter Property="Width" Value="30" />
-			<Setter Property="Height" Value="30" />
-			<Setter Property="MinWidth" Value="30" />
+			<Setter Property="Height" Value="28" />
+			<Setter Property="MinWidth" Value="28" />
 			<Setter Property="VerticalContentAlignment" Value="Center" />
 			<Setter Property="HorizontalContentAlignment" Value="Center" />
 			<Setter Property="CornerRadius" Value="6" />

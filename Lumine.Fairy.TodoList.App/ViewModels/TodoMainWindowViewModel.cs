@@ -142,6 +142,22 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     private string _dailyReportBrowseSearchText = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TodoSaveStateText))]
+    private bool _hasPendingTodoChanges;
+
+    [ObservableProperty]
+    private string _todoSearchText = string.Empty;
+
+    [ObservableProperty]
+    private string _selectedTodoStatusFilter = "全部";
+
+    [ObservableProperty]
+    private string _selectedTodoPriorityFilter = "全部";
+
+    [ObservableProperty]
+    private string _selectedTodoDateFilter = "全部";
+
+    [ObservableProperty]
     private bool _isBusy;
 
     public ObservableCollection<string> ProjectNameSuggestions { get; } = [];
@@ -156,7 +172,23 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
 
     public ObservableCollection<DailyReportBrowseItemViewModel> BrowseReports { get; } = [];
 
+    public ObservableCollection<TodoBoardColumnViewModel> TodoBoardColumns { get; } =
+    [
+        new(TodoStatus.NotStarted, "未开始"),
+        new(TodoStatus.InProgress, "进行中"),
+        new(TodoStatus.Blocked, "阻塞"),
+        new(TodoStatus.Completed, "已完成")
+    ];
+
     public IReadOnlyList<TodoStatus> TodoStatusOptions { get; }
+
+    public IReadOnlyList<TodoPriority> TodoPriorityOptions { get; } = Enum.GetValues<TodoPriority>();
+
+    public IReadOnlyList<string> TodoStatusFilterOptions { get; } = ["全部", "未开始", "进行中", "阻塞", "已完成"];
+
+    public IReadOnlyList<string> TodoPriorityFilterOptions { get; } = ["全部", "紧急", "高", "普通", "低"];
+
+    public IReadOnlyList<string> TodoDateFilterOptions { get; } = ["全部", "今天", "即将到期", "已逾期"];
 
     public bool HasFormattedDailyReportText => !string.IsNullOrWhiteSpace(FormattedDailyReportText);
 
@@ -181,6 +213,20 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     public bool IsWeekBrowseScope => SelectedBrowseScope == DailyReportBrowseScope.Week;
 
     public bool IsMonthBrowseScope => SelectedBrowseScope == DailyReportBrowseScope.Month;
+
+    public string TodoSaveStateText => HasPendingTodoChanges ? "有未保存更改" : "已保存";
+
+    public string TodoSummaryText
+    {
+        get
+        {
+            var activeItems = TodoEntries.Where(item => !item.IsArchived).ToList();
+            var overdueCount = activeItems.Count(item => item.IsOverdue);
+            var completedCount = activeItems.Count(item => item.Status == TodoStatus.Completed);
+            var totalHours = activeItems.Sum(item => decimal.TryParse(item.WorkHoursText, out var hours) ? hours : 0);
+            return $"活动 {activeItems.Count} · 已完成 {completedCount} · 逾期 {overdueCount} · 工时 {totalHours:0.##}h";
+        }
+    }
 
     public string SelectedTodoViewModeTitle => SelectedTodoViewMode switch
     {
@@ -257,6 +303,202 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void AddTodo()
+    {
+        AddTodoFromTemplate("", "", TodoPriority.Normal, []);
+        StatusText = "已新建 Todo，请填写任务内容。";
+    }
+
+    [RelayCommand]
+    private void AddDailyReportTemplate()
+    {
+        AddTodoFromTemplate("整理并提交日报", "检查今日任务、补齐工时并上传日报。", TodoPriority.Normal, ["日报"]);
+        StatusText = "已从“日报跟进”模板新建 Todo。";
+    }
+
+    [RelayCommand]
+    private void AddClientFollowUpTemplate()
+    {
+        AddTodoFromTemplate("跟进客户反馈", "确认问题、记录处理方案并回复客户。", TodoPriority.High, ["客户", "跟进"]);
+        StatusText = "已从“客户跟进”模板新建 Todo。";
+    }
+
+    private void AddTodoFromTemplate(string title, string content, TodoPriority priority, IReadOnlyList<string> labels)
+    {
+        var selectedDate = ResolveSelectedTodoWorkDate();
+        var item = new TodoEntryItemViewModel
+        {
+            WorkDate = CreateDateOffset(selectedDate),
+            ProjectName = InferPreferredProjectName(),
+            Title = title,
+            Content = content,
+            Priority = priority,
+            LabelsText = string.Join(", ", labels),
+            IsDaily = true,
+            SortOrder = NextTodoSortOrder()
+        };
+
+        TodoEntries.Add(item);
+        MarkPendingTodoChanges();
+        SelectedTodoViewMode = TodoWorkspaceViewMode.FormattedOnly;
+    }
+
+    [RelayCommand]
+    private void CompleteTodo(TodoEntryItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.Status = TodoStatus.Completed;
+        MarkPendingTodoChanges();
+        StatusText = $"已完成 Todo：{item.DisplayTitle}";
+    }
+
+    [RelayCommand]
+    private void ArchiveTodo(TodoEntryItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsArchived = true;
+        MarkPendingTodoChanges();
+        StatusText = $"已归档 Todo：{item.DisplayTitle}";
+    }
+
+    [RelayCommand]
+    private void DeleteTodo(TodoEntryItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        TodoEntries.Remove(item);
+        MarkPendingTodoChanges();
+        StatusText = "Todo 已删除。";
+    }
+
+    [RelayCommand]
+    private void MoveTodoUp(TodoEntryItemViewModel? item)
+    {
+        MoveTodo(item, -1);
+    }
+
+    [RelayCommand]
+    private void MoveTodoDown(TodoEntryItemViewModel? item)
+    {
+        MoveTodo(item, 1);
+    }
+
+    private void MoveTodo(TodoEntryItemViewModel? item, int direction)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var siblings = TodoEntries
+            .Where(candidate => !candidate.IsArchived && candidate.Status == item.Status)
+            .OrderBy(candidate => candidate.SortOrder)
+            .ToList();
+        var index = siblings.IndexOf(item);
+        var targetIndex = index + direction;
+        if (index < 0 || targetIndex < 0 || targetIndex >= siblings.Count)
+        {
+            return;
+        }
+
+        (siblings[index].SortOrder, siblings[targetIndex].SortOrder) =
+            (siblings[targetIndex].SortOrder, siblings[index].SortOrder);
+        MarkPendingTodoChanges();
+        RefreshTodoBoardColumns();
+    }
+
+    public void MoveTodoToBoard(string itemId, TodoStatus targetStatus, string? beforeItemId)
+    {
+        var item = TodoEntries.FirstOrDefault(candidate => candidate.Id == itemId && !candidate.IsArchived);
+        if (item is null)
+        {
+            return;
+        }
+
+        var sourceStatus = item.Status;
+        var targetItems = TodoEntries
+            .Where(candidate => !candidate.IsArchived && candidate.Status == targetStatus && candidate.Id != item.Id)
+            .OrderBy(candidate => candidate.SortOrder)
+            .ToList();
+        var targetIndex = beforeItemId is null
+            ? targetItems.Count
+            : targetItems.FindIndex(candidate => candidate.Id == beforeItemId);
+        if (targetIndex < 0)
+        {
+            targetIndex = targetItems.Count;
+        }
+
+        if (sourceStatus == targetStatus && beforeItemId == item.Id)
+        {
+            return;
+        }
+
+        item.Status = targetStatus;
+        targetItems.Insert(Math.Clamp(targetIndex, 0, targetItems.Count), item);
+        NormalizeTodoSortOrder(sourceStatus);
+        NormalizeTodoSortOrder(targetStatus);
+        MarkPendingTodoChanges();
+        RefreshTodoBoardColumns();
+    }
+
+    private void NormalizeTodoSortOrder(TodoStatus status)
+    {
+        var items = TodoEntries
+            .Where(candidate => !candidate.IsArchived && candidate.Status == status)
+            .OrderBy(candidate => candidate.SortOrder)
+            .ToList();
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            items[index].SortOrder = (index + 1) * 10;
+        }
+    }
+
+    [RelayCommand]
+    private void ClearTodoSearch()
+    {
+        TodoSearchText = string.Empty;
+        SelectedTodoStatusFilter = "全部";
+        SelectedTodoPriorityFilter = "全部";
+        SelectedTodoDateFilter = "全部";
+    }
+
+    [RelayCommand]
+    private async Task OpenTodoDetailAsync(TodoEntryItemViewModel? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        var owner = (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        var detailWindow = new TodoDetailWindow { DataContext = item };
+        if (owner is not null)
+        {
+            await detailWindow.ShowDialog(owner);
+        }
+        else
+        {
+            detailWindow.Show();
+        }
+
+        MarkPendingTodoChanges();
+        RefreshDailyTodoEntries();
+        RefreshFormattedDailyReportPreview();
+    }
+
+    [RelayCommand]
     private void ParseScratchNote()
     {
         CancelPendingAutoArrange();
@@ -271,6 +513,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         DailyTodoText = AppendScratchSectionText(DailyTodoText, exampleTemplate.DailyTodoText);
         LongTermTodoText = AppendScratchSectionText(LongTermTodoText, exampleTemplate.LongTermTodoText);
         TemporaryIssueText = AppendScratchSectionText(TemporaryIssueText, exampleTemplate.TemporaryIssueText);
+        ScratchNoteText = BuildUnifiedDisplayText(new ScratchNoteSections(DailyTodoText, LongTermTodoText, TemporaryIssueText));
         StatusText = "已插入示例模板，可直接改写为今天的实际记录。";
     }
 
@@ -515,6 +758,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         {
             CancelPendingAutoSave();
             await PersistTodoWorkspaceAsync(CaptureTodoWorkspaceSaveState(), refreshSnapshot: true, updateStatusMessage: true, cancellationToken: CancellationToken.None);
+            HasPendingTodoChanges = false;
         });
     }
 
@@ -602,6 +846,12 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         ScheduleAutoArrange();
     }
 
+    partial void OnTemporaryIssueTextChanged(string value)
+    {
+        RefreshTemporaryIssueCount();
+        RefreshTodoSectionState();
+    }
+
     partial void OnTodoWorkDateChanged(DateTimeOffset? value)
     {
         if (_suppressTodoWorkDateRefresh)
@@ -617,6 +867,26 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(BrowseRangeTitle));
         OnPropertyChanged(nameof(DefaultUploadRangePreviewText));
         OnPropertyChanged(nameof(UploadDailyReportsToolTipText));
+    }
+
+    partial void OnTodoSearchTextChanged(string value)
+    {
+        RefreshTodoBoardColumns();
+    }
+
+    partial void OnSelectedTodoStatusFilterChanged(string value)
+    {
+        RefreshTodoBoardColumns();
+    }
+
+    partial void OnSelectedTodoPriorityFilterChanged(string value)
+    {
+        RefreshTodoBoardColumns();
+    }
+
+    partial void OnSelectedTodoDateFilterChanged(string value)
+    {
+        RefreshTodoBoardColumns();
     }
 
     partial void OnSelectedTodoViewModeChanged(TodoWorkspaceViewMode value)
@@ -672,6 +942,11 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     private async Task ShowOperationFeedbackDialogAsync(string title, string message, bool isError = false)
     {
         var owner = (Avalonia.Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
+        if (owner is null)
+        {
+            return;
+        }
+
         var closeButton = new Button
         {
             Content = "确定",
@@ -897,6 +1172,80 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
 
         RefreshMissingWorkHoursState();
         OnPropertyChanged(nameof(HasDailyTodoEntries));
+        RefreshTodoBoardColumns();
+    }
+
+    private void RefreshTodoBoardColumns()
+    {
+        var searchText = TodoSearchText.Trim();
+        var statusFilter = ResolveStatusFilter(SelectedTodoStatusFilter);
+        var priorityFilter = ResolvePriorityFilter(SelectedTodoPriorityFilter);
+
+        foreach (var column in TodoBoardColumns)
+        {
+            ReplaceCollection(column.Items, TodoEntries
+                .Where(item => !item.IsArchived && item.Status == column.Status)
+                .Where(item => statusFilter is null || item.Status == statusFilter)
+                .Where(item => priorityFilter is null || item.Priority == priorityFilter)
+                .Where(MatchesTodoDateFilter)
+                .Where(item => MatchesTodoSearch(item, searchText))
+                .OrderByDescending(item => item.Priority)
+                .ThenBy(item => item.DueDate ?? DateTimeOffset.MaxValue)
+                .ThenBy(item => item.SortOrder));
+            column.RefreshCount();
+        }
+
+        OnPropertyChanged(nameof(TodoSummaryText));
+    }
+
+    private bool MatchesTodoDateFilter(TodoEntryItemViewModel item)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var dueDate = item.DueDate.HasValue ? DateOnly.FromDateTime(item.DueDate.Value.DateTime) : (DateOnly?)null;
+        return SelectedTodoDateFilter switch
+        {
+            "今天" => dueDate == today || (item.WorkDate.HasValue && DateOnly.FromDateTime(item.WorkDate.Value.DateTime) == today),
+            "即将到期" => dueDate.HasValue && dueDate.Value >= today && dueDate.Value <= today.AddDays(7) && item.Status != TodoStatus.Completed,
+            "已逾期" => item.IsOverdue,
+            _ => true
+        };
+    }
+
+    private static bool MatchesTodoSearch(TodoEntryItemViewModel item, string searchText)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return true;
+        }
+
+        return string.Join(" ", item.ProjectName, item.DisplayTitle, item.Content, item.Notes, item.SourceText, item.LabelsText)
+            .Contains(searchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static TodoStatus? ResolveStatusFilter(string filter)
+        => filter switch
+        {
+            "未开始" => TodoStatus.NotStarted,
+            "进行中" => TodoStatus.InProgress,
+            "阻塞" => TodoStatus.Blocked,
+            "已完成" => TodoStatus.Completed,
+            _ => null
+        };
+
+    private static TodoPriority? ResolvePriorityFilter(string filter)
+        => filter switch
+        {
+            "紧急" => TodoPriority.Urgent,
+            "高" => TodoPriority.High,
+            "普通" => TodoPriority.Normal,
+            "低" => TodoPriority.Low,
+            _ => null
+        };
+
+    private void MarkPendingTodoChanges()
+    {
+        HasPendingTodoChanges = true;
+        OnPropertyChanged(nameof(TodoSaveStateText));
     }
 
     private bool IsCurrentWorkDateDailyTodo(TodoEntryItemViewModel item)
@@ -1030,6 +1379,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasBrowseReports));
         OnPropertyChanged(nameof(BrowseRangeTitle));
         OnPropertyChanged(nameof(TodoStatusBarText));
+        OnPropertyChanged(nameof(TodoSummaryText));
     }
 
     private void OnTodoEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -1055,6 +1405,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
             return;
         }
 
+        MarkPendingTodoChanges();
         RefreshProjectNameSuggestions();
         RefreshDailyTodoEntries();
         RefreshFormattedDailyReportPreview();
@@ -1100,10 +1451,17 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
             or nameof(TodoEntryItemViewModel.Title)
             or nameof(TodoEntryItemViewModel.Content)
             or nameof(TodoEntryItemViewModel.Status)
+            or nameof(TodoEntryItemViewModel.Priority)
+            or nameof(TodoEntryItemViewModel.DueDate)
             or nameof(TodoEntryItemViewModel.WorkHoursText)
             or nameof(TodoEntryItemViewModel.IsDaily)
+            or nameof(TodoEntryItemViewModel.IsArchived)
+            or nameof(TodoEntryItemViewModel.LabelsText)
+            or nameof(TodoEntryItemViewModel.RepeatRule)
+            or nameof(TodoEntryItemViewModel.ReminderMinutesText)
             or nameof(TodoEntryItemViewModel.SortOrder))
         {
+            MarkPendingTodoChanges();
             if (e.PropertyName == nameof(TodoEntryItemViewModel.ProjectName))
             {
                 RefreshProjectNameSuggestions();
@@ -1517,12 +1875,24 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
             Title = item.Title,
             Content = item.Content,
             Status = item.Status,
+            Priority = item.Priority,
+            DueDate = item.DueDate,
             WorkHours = item.WorkHours,
             IsDaily = item.IsDaily,
             IsFromScratchNote = item.IsFromScratchNote,
             SourceText = item.SourceText,
             SortOrder = item.SortOrder,
-            Notes = item.Notes
+            Notes = item.Notes,
+            Labels = [.. item.Labels],
+            Checklist = item.Checklist.Select(static checklistItem => new TodoChecklistItem
+            {
+                Id = checklistItem.Id,
+                Text = checklistItem.Text,
+                IsCompleted = checklistItem.IsCompleted
+            }).ToList(),
+            IsArchived = item.IsArchived,
+            RepeatRule = item.RepeatRule,
+            ReminderMinutesBeforeDue = item.ReminderMinutesBeforeDue
         };
     }
 
@@ -1624,7 +1994,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
 
     private static ScratchNoteSections BuildScratchNoteExampleTemplate(DateOnly workDate)
         => new(
-            DailyTodoText: $"1.Lumine.Fairy: 完成 Todo / 日报体验优化 1.5{Environment.NewLine}2.Lumine.Fairy: 整理周月浏览联调 ← 0.5",
+            DailyTodoText: $"每日 Todo{Environment.NewLine}1.Lumine.Fairy: 完成 Todo / 日报体验优化 1.5{Environment.NewLine}2.Lumine.Fairy: 整理周月浏览联调 ← 0.5",
             LongTermTodoText: $"Lumine.Fairy{Environment.NewLine}1.补未归类片段手工归置{Environment.NewLine}2.补日报工时校验提示 √",
             TemporaryIssueText: $"客户/项目: 客户A{Environment.NewLine}问题: 提交按钮点击后无反馈{Environment.NewLine}方案: 补充错误提示并记录日志");
 
@@ -1762,6 +2132,13 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
         else
         {
             builder.Add($"{workDate:M/d}");
+        }
+
+        var normalizedLongTermTodoText = NormalizeDailyTodoText(LongTermTodoText);
+        if (!string.IsNullOrWhiteSpace(normalizedLongTermTodoText))
+        {
+            builder.Add("======");
+            builder.Add(normalizedLongTermTodoText);
         }
 
         return string.Join(Environment.NewLine, builder).TrimEnd();

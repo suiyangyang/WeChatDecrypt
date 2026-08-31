@@ -15,16 +15,16 @@
         mc:Ignorable="d">
   <Window.Styles>
     <Style Selector="TextBox.settings-input">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,3" />
       <Setter Property="Background" Value="#FFFFFF" />
       <Setter Property="BorderBrush" Value="#D1D5DB" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Foreground" Value="#334155" />
     </Style>
     <Style Selector="Button.settings-secondary">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="12,4" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Background" Value="#FFFFFF" />
       <Setter Property="BorderBrush" Value="#CBD5E1" />
@@ -32,8 +32,8 @@
       <Setter Property="Foreground" Value="#334155" />
     </Style>
     <Style Selector="Button.settings-primary">
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="14,6" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="Padding" Value="12,4" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Background" Value="#2563EB" />
       <Setter Property="BorderBrush" Value="#1D4ED8" />
@@ -44,7 +44,7 @@
 
   <Grid RowDefinitions="Auto,*,Auto" Margin="16">
     <StackPanel Spacing="4">
-      <TextBlock Text="上传设置" FontSize="20" FontWeight="SemiBold" />
+      <TextBlock Text="上传设置" FontSize="16" FontWeight="SemiBold" />
       <TextBlock Text="配置 ReportMind 服务地址和登录凭据。上传前会先登录获取 token。" Foreground="#64748B" TextWrapping="Wrap" />
     </StackPanel>
 

@@ -29,6 +29,12 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
     private TodoStatus _status = TodoStatus.NotStarted;
 
     [ObservableProperty]
+    private TodoPriority _priority = TodoPriority.Normal;
+
+    [ObservableProperty]
+    private DateTimeOffset? _dueDate;
+
+    [ObservableProperty]
     private string _workHoursText = string.Empty;
 
     [ObservableProperty]
@@ -47,9 +53,60 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
     private string _notes = string.Empty;
 
     [ObservableProperty]
+    private string _labelsText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isArchived;
+
+    [ObservableProperty]
+    private string _repeatRule = "不重复";
+
+    [ObservableProperty]
+    private string _reminderMinutesText = string.Empty;
+
+    public ObservableCollection<TodoChecklistItem> Checklist { get; } = [];
+
+    public int CompletedChecklistCount => Checklist.Count(item => item.IsCompleted);
+
+    public string ChecklistProgressText => Checklist.Count == 0
+        ? string.Empty
+        : $"{CompletedChecklistCount}/{Checklist.Count}";
+
+    public bool HasChecklist => Checklist.Count > 0;
+
+    public bool CanComplete => Status != TodoStatus.Completed;
+
+    public string DisplayTitle => string.IsNullOrWhiteSpace(Title)
+        ? string.IsNullOrWhiteSpace(Content) ? "未命名 Todo" : Content.Trim()
+        : Title.Trim();
+
+    public string PriorityText => Priority switch
+    {
+        TodoPriority.Urgent => "紧急",
+        TodoPriority.High => "高",
+        TodoPriority.Low => "低",
+        _ => "普通"
+    };
+
+    public string DueDateText => DueDate.HasValue ? $"截止 {DueDate.Value:yyyy-MM-dd}" : "未设置截止日期";
+
+    public bool HasDueDate => DueDate.HasValue;
+
+    public bool IsOverdue => DueDate.HasValue
+        && DateOnly.FromDateTime(DueDate.Value.DateTime) < DateOnly.FromDateTime(DateTime.Today)
+        && Status != TodoStatus.Completed
+        && !IsArchived;
+
+    [ObservableProperty]
     private bool _shouldFocusProjectNameEditor;
 
     public ObservableCollection<string> FilteredProjectNameSuggestions { get; } = [];
+
+    public IReadOnlyList<TodoStatus> TodoStatusOptions { get; } = Enum.GetValues<TodoStatus>();
+
+    public IReadOnlyList<TodoPriority> TodoPriorityOptions { get; } = Enum.GetValues<TodoPriority>();
+
+    public IReadOnlyList<string> TodoRepeatOptions { get; } = ["不重复", "每天", "每周", "每月"];
 
     public string DisplayContent => string.IsNullOrWhiteSpace(Content) ? Title : Content;
 
@@ -64,7 +121,7 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
 
     public static TodoEntryItemViewModel FromModel(TodoEntry model)
     {
-        return new TodoEntryItemViewModel
+        var viewModel = new TodoEntryItemViewModel
         {
             Id = model.Id,
             WorkDate = model.WorkDate.HasValue
@@ -74,13 +131,34 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
             Title = model.Title,
             Content = model.Content,
             Status = model.Status,
+            Priority = model.Priority,
+            DueDate = model.DueDate.HasValue
+                ? new DateTimeOffset(DateTime.SpecifyKind(model.DueDate.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Unspecified), TimeSpan.Zero)
+                : null,
             WorkHoursText = model.WorkHours?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty,
             IsDaily = model.IsDaily,
             IsFromScratchNote = model.IsFromScratchNote,
             SourceText = model.SourceText,
             SortOrder = model.SortOrder,
-            Notes = model.Notes
+            Notes = model.Notes,
+            LabelsText = string.Join(", ", model.Labels),
+            IsArchived = model.IsArchived,
+            RepeatRule = string.IsNullOrWhiteSpace(model.RepeatRule) ? "不重复" : model.RepeatRule,
+            ReminderMinutesText = model.ReminderMinutesBeforeDue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty
         };
+
+        foreach (var checklistItem in model.Checklist)
+        {
+            viewModel.Checklist.Add(new TodoChecklistItem
+            {
+                Id = checklistItem.Id,
+                Text = checklistItem.Text,
+                IsCompleted = checklistItem.IsCompleted
+            });
+        }
+
+        viewModel.RefreshChecklistState();
+        return viewModel;
     }
 
     public TodoEntry ToModel()
@@ -93,17 +171,28 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
             Title = Title.Trim(),
             Content = Content.Trim(),
             Status = Status,
+            Priority = Priority,
+            DueDate = DueDate.HasValue ? DateOnly.FromDateTime(DueDate.Value.DateTime) : null,
             WorkHours = TryParseWorkHours(WorkHoursText),
             IsDaily = IsDaily,
             IsFromScratchNote = IsFromScratchNote,
             SourceText = SourceText,
             SortOrder = SortOrder,
-            Notes = Notes.Trim()
+            Notes = Notes.Trim(),
+            Labels = LabelsText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            Checklist = Checklist.ToList(),
+            IsArchived = IsArchived,
+            RepeatRule = string.IsNullOrWhiteSpace(RepeatRule) ? "不重复" : RepeatRule,
+            ReminderMinutesBeforeDue = int.TryParse(ReminderMinutesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminderMinutes)
+                && reminderMinutes >= 0
+                ? reminderMinutes
+                : null
         };
     }
 
     partial void OnTitleChanged(string value)
     {
+        OnPropertyChanged(nameof(DisplayTitle));
         OnPropertyChanged(nameof(DisplayContent));
         OnPropertyChanged(nameof(HasSecondaryTitle));
         OnPropertyChanged(nameof(HasSourceReference));
@@ -111,6 +200,7 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
 
     partial void OnContentChanged(string value)
     {
+        OnPropertyChanged(nameof(DisplayTitle));
         OnPropertyChanged(nameof(DisplayContent));
         OnPropertyChanged(nameof(HasSecondaryTitle));
         OnPropertyChanged(nameof(HasSourceReference));
@@ -128,6 +218,36 @@ public sealed partial class TodoEntryItemViewModel : ObservableObject
         {
             RefreshFilteredProjectNameSuggestions();
         }
+    }
+
+    partial void OnStatusChanged(TodoStatus value)
+    {
+        OnPropertyChanged(nameof(CanComplete));
+        OnPropertyChanged(nameof(IsOverdue));
+    }
+
+    partial void OnDueDateChanged(DateTimeOffset? value)
+    {
+        OnPropertyChanged(nameof(HasDueDate));
+        OnPropertyChanged(nameof(DueDateText));
+        OnPropertyChanged(nameof(IsOverdue));
+    }
+
+    partial void OnPriorityChanged(TodoPriority value)
+    {
+        OnPropertyChanged(nameof(PriorityText));
+    }
+
+    partial void OnIsArchivedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsOverdue));
+    }
+
+    public void RefreshChecklistState()
+    {
+        OnPropertyChanged(nameof(CompletedChecklistCount));
+        OnPropertyChanged(nameof(ChecklistProgressText));
+        OnPropertyChanged(nameof(HasChecklist));
     }
 
     /// <summary>

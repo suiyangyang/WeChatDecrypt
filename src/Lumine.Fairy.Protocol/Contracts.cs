@@ -15,7 +15,7 @@ public sealed record NotificationAction(
 
 public sealed record NotificationRequest(
     string Title,
-    string Body,
+    string? Body,
     string Source = "local",
     string Category = "other",
     string Severity = "info",
@@ -194,6 +194,22 @@ public sealed record TodoCandidate(
     double Confidence,
     IReadOnlyList<string> SourceRefs);
 
+public sealed record TodoLabel(string Id, string Name, string Color);
+
+public sealed record TodoChecklistItem(string Id, string Text, bool IsCompleted);
+
+public sealed record TodoComment(string Id, string Author, string Text, DateTimeOffset CreatedAt);
+
+public sealed record TodoBoardRecord(string Id, string Name, string Color);
+
+public sealed record TodoListRecord(
+    string Id,
+    string BoardId,
+    string Name,
+    int Position,
+    string? Status = null,
+    bool IsArchived = false);
+
 public sealed record TodoRecord(
     string Id,
     string Title,
@@ -212,7 +228,15 @@ public sealed record TodoRecord(
     string? CompanyId = null,
     string? CompanyName = null,
     string? ConversationDisplayName = null,
-    bool IsGroupConversation = false);
+    bool IsGroupConversation = false,
+    string BoardId = "default",
+    string ListId = "todo",
+    int Position = 0,
+    bool IsArchived = false,
+    IReadOnlyList<TodoLabel>? Labels = null,
+    IReadOnlyList<TodoChecklistItem>? Checklist = null,
+    IReadOnlyList<TodoComment>? Comments = null,
+    DateTimeOffset? UpdatedAt = null);
 
 public sealed record IntentCandidate(
     string Id,

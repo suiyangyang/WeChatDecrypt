@@ -271,12 +271,24 @@ public sealed partial class HistoryWindowViewModel : ObservableObject
                     Title = item.Title,
                     Content = item.Content,
                     Status = item.Status,
+                    Priority = item.Priority,
+                    DueDate = item.DueDate,
                     WorkHours = item.WorkHours,
                     IsDaily = item.IsDaily,
                     IsFromScratchNote = item.IsFromScratchNote,
                     SourceText = item.SourceText,
                     SortOrder = item.SortOrder,
-                    Notes = item.Notes
+                    Notes = item.Notes,
+                    Labels = [.. item.Labels],
+                    Checklist = item.Checklist.Select(static checklistItem => new TodoChecklistItem
+                    {
+                        Id = checklistItem.Id,
+                        Text = checklistItem.Text,
+                        IsCompleted = checklistItem.IsCompleted
+                    }).ToList(),
+                    IsArchived = item.IsArchived,
+                    RepeatRule = item.RepeatRule,
+                    ReminderMinutesBeforeDue = item.ReminderMinutesBeforeDue
                 })
                 .ToList();
 

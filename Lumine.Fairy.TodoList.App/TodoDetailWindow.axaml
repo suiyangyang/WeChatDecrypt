@@ -1,0 +1,100 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Lumine.Fairy.TodoList.App.ViewModels"
+        x:Class="Lumine.Fairy.TodoList.App.TodoDetailWindow"
+        x:DataType="vm:TodoEntryItemViewModel"
+        Width="560"
+        Height="720"
+        MinWidth="480"
+        MinHeight="620"
+        Title="Todo 详情">
+  <Window.Styles>
+    <Style Selector="ComboBox">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+  </Window.Styles>
+  <ScrollViewer>
+    <StackPanel Margin="20" Spacing="12">
+      <TextBlock FontSize="16" FontWeight="SemiBold" Text="Todo 详情" />
+      <TextBlock FontSize="11" Foreground="#64748B" Text="编辑会立即更新当前工作区，关闭窗口后仍需点击保存。" TextWrapping="Wrap" />
+      <TextBlock FontSize="12" Foreground="#475569" Text="标题" />
+      <TextBox Text="{Binding Title}" Watermark="任务标题" />
+      <TextBlock FontSize="12" Foreground="#475569" Text="项目" />
+      <ComboBox ItemsSource="{Binding FilteredProjectNameSuggestions}"
+                IsEditable="True"
+                Text="{Binding ProjectName}" />
+      <TextBlock FontSize="12" Foreground="#475569" Text="描述" />
+      <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" Text="{Binding Content}" Watermark="任务描述" />
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <StackPanel Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="状态" />
+          <ComboBox ItemsSource="{Binding TodoStatusOptions}" SelectedItem="{Binding Status}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="优先级" />
+          <ComboBox ItemsSource="{Binding TodoPriorityOptions}" SelectedItem="{Binding Priority}" />
+        </StackPanel>
+      </Grid>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <StackPanel Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="重复任务" />
+          <ComboBox ItemsSource="{Binding TodoRepeatOptions}" SelectedItem="{Binding RepeatRule}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="提前提醒（分钟）" />
+          <TextBox Text="{Binding ReminderMinutesText}" Watermark="例如：1440" />
+        </StackPanel>
+      </Grid>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <StackPanel Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="工作日期" />
+          <DatePicker SelectedDate="{Binding WorkDate}" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="截止日期" />
+          <DatePicker SelectedDate="{Binding DueDate}" />
+        </StackPanel>
+      </Grid>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+        <StackPanel Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="工时" />
+          <TextBox Text="{Binding WorkHoursText}" Watermark="小时" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="5">
+          <TextBlock FontSize="12" Foreground="#475569" Text="标签" />
+          <TextBox Text="{Binding LabelsText}" Watermark="多个标签用逗号分隔" />
+        </StackPanel>
+      </Grid>
+      <TextBlock FontSize="12" Foreground="#475569" Text="备注" />
+      <TextBox AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" Text="{Binding Notes}" />
+      <Border Padding="10" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8">
+        <StackPanel Spacing="6">
+          <TextBlock FontWeight="SemiBold" Text="Checklist" />
+          <ItemsControl ItemsSource="{Binding Checklist}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" Margin="0,2">
+                  <CheckBox IsChecked="{Binding IsCompleted}" Checked="ChecklistItemChanged" Unchecked="ChecklistItemChanged" />
+                  <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="{Binding Text}" TextWrapping="Wrap" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox x:Name="ChecklistInput" Watermark="添加子任务" />
+            <Button Grid.Column="1" Content="添加" Click="AddChecklistItem_Click" Padding="10,5" />
+          </Grid>
+          <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding ChecklistProgressText}" />
+        </StackPanel>
+      </Border>
+      <Border Padding="10" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" IsVisible="{Binding HasSourceReference}">
+        <StackPanel Spacing="5">
+          <TextBlock FontWeight="SemiBold" Text="来源" />
+          <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding SourceReferenceText}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Button Content="关闭" HorizontalAlignment="Right" Click="Close_Click" Padding="18,7" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>
