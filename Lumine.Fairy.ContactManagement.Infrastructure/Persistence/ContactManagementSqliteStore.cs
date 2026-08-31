@@ -196,6 +196,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                     account_id          TEXT NOT NULL,
                     account_display_name TEXT NOT NULL DEFAULT '',
                     wechat_username     TEXT NOT NULL,
+                    is_group_chat       INTEGER NOT NULL DEFAULT 1,
                     display_name        TEXT NOT NULL,
                     last_message_at     TEXT NULL,
                     company_id          TEXT NULL,
@@ -229,7 +230,14 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                     is_from_scratch_note    INTEGER NOT NULL DEFAULT 0,
                     source_text             TEXT NOT NULL DEFAULT '',
                     sort_order              INTEGER NOT NULL DEFAULT 0,
-                    notes                   TEXT NOT NULL DEFAULT ''
+                    notes                   TEXT NOT NULL DEFAULT '',
+                    due_date                TEXT NULL,
+                    priority                INTEGER NOT NULL DEFAULT 1,
+                    labels_json             TEXT NOT NULL DEFAULT '[]',
+                    checklist_json          TEXT NOT NULL DEFAULT '[]',
+                    is_archived             INTEGER NOT NULL DEFAULT 0,
+                    repeat_rule             TEXT NOT NULL DEFAULT '不重复',
+                    reminder_minutes        INTEGER NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS client_issue_entries (
@@ -377,6 +385,30 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
 
                     SetSchemaVersion(connection, 7);
                     version = 7;
+                    break;
+                case 7:
+                    AddColumnIfMissing(connection, "wechat_group_chats", "is_group_chat", "INTEGER NOT NULL DEFAULT 1");
+
+                    SetSchemaVersion(connection, 8);
+                    version = 8;
+                    break;
+                case 8:
+
+                    AddColumnIfMissing(connection, "todo_entries", "due_date", "TEXT NULL");
+                    AddColumnIfMissing(connection, "todo_entries", "priority", "INTEGER NOT NULL DEFAULT 1");
+                    AddColumnIfMissing(connection, "todo_entries", "labels_json", "TEXT NOT NULL DEFAULT '[]'");
+                    AddColumnIfMissing(connection, "todo_entries", "checklist_json", "TEXT NOT NULL DEFAULT '[]'");
+                    AddColumnIfMissing(connection, "todo_entries", "is_archived", "INTEGER NOT NULL DEFAULT 0");
+
+                    SetSchemaVersion(connection, 9);
+                    version = 9;
+                    break;
+                case 9:
+                    AddColumnIfMissing(connection, "todo_entries", "repeat_rule", "TEXT NOT NULL DEFAULT '不重复'");
+                    AddColumnIfMissing(connection, "todo_entries", "reminder_minutes", "INTEGER NULL");
+
+                    SetSchemaVersion(connection, 10);
+                    version = 10;
                     break;
                 default:
                     throw new InvalidOperationException($"不支持从 schemaVersion={currentVersion} 升级到 {targetVersion}。");
@@ -548,7 +580,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
     {
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT id, account_id, account_display_name, wechat_username, display_name, last_message_at, company_id, project_id, is_active, last_synced_at
+            SELECT id, account_id, account_display_name, wechat_username, is_group_chat, display_name, last_message_at, company_id, project_id, is_active, last_synced_at
             FROM wechat_group_chats
             ORDER BY last_message_at DESC, display_name ASC, id ASC;
             """;
@@ -563,12 +595,13 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                 AccountId = reader.GetString(1),
                 AccountDisplayName = reader.GetString(2),
                 WeChatUsername = reader.GetString(3),
-                DisplayName = reader.GetString(4),
-                LastMessageAt = reader.IsDBNull(5) ? null : ParseDateTimeOffset(reader.GetString(5)),
-                CompanyId = reader.IsDBNull(6) ? null : reader.GetString(6),
-                ProjectId = reader.IsDBNull(7) ? null : reader.GetString(7),
-                IsActive = reader.GetInt64(8) != 0,
-                LastSyncedAt = ParseDateTimeOffset(reader.GetString(9))
+                IsGroupChat = reader.GetInt64(4) != 0,
+                DisplayName = reader.GetString(5),
+                LastMessageAt = reader.IsDBNull(6) ? null : ParseDateTimeOffset(reader.GetString(6)),
+                CompanyId = reader.IsDBNull(7) ? null : reader.GetString(7),
+                ProjectId = reader.IsDBNull(8) ? null : reader.GetString(8),
+                IsActive = reader.GetInt64(9) != 0,
+                LastSyncedAt = ParseDateTimeOffset(reader.GetString(10))
             });
         }
 
@@ -579,7 +612,7 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
     {
         using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT id, work_date, project_name, title, content, status, work_hours, is_daily, is_from_scratch_note, source_text, sort_order, notes
+            SELECT id, work_date, project_name, title, content, status, work_hours, is_daily, is_from_scratch_note, source_text, sort_order, notes, due_date, priority, labels_json, checklist_json, is_archived, repeat_rule, reminder_minutes
             FROM todo_entries
             ORDER BY work_date ASC, sort_order ASC, id ASC;
             """;
@@ -601,7 +634,14 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
                 IsFromScratchNote = reader.GetInt64(8) != 0,
                 SourceText = reader.GetString(9),
                 SortOrder = reader.GetInt32(10),
-                Notes = reader.GetString(11)
+                Notes = reader.GetString(11),
+                DueDate = reader.IsDBNull(12) ? null : ParseDateOnly(reader.GetString(12)),
+                Priority = (TodoPriority)reader.GetInt32(13),
+                Labels = DeserializeStringList(reader.GetString(14)),
+                Checklist = DeserializeJson<List<TodoChecklistItem>>(reader.GetString(15)) ?? [],
+                IsArchived = reader.GetInt64(16) != 0,
+                RepeatRule = reader.GetString(17),
+                ReminderMinutesBeforeDue = reader.IsDBNull(18) ? null : reader.GetInt32(18)
             });
         }
 
@@ -766,13 +806,14 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
-                INSERT INTO wechat_group_chats(id, account_id, account_display_name, wechat_username, display_name, last_message_at, company_id, project_id, is_active, last_synced_at)
-                VALUES($id, $account_id, $account_display_name, $wechat_username, $display_name, $last_message_at, $company_id, $project_id, $is_active, $last_synced_at);
+                INSERT INTO wechat_group_chats(id, account_id, account_display_name, wechat_username, is_group_chat, display_name, last_message_at, company_id, project_id, is_active, last_synced_at)
+                VALUES($id, $account_id, $account_display_name, $wechat_username, $is_group_chat, $display_name, $last_message_at, $company_id, $project_id, $is_active, $last_synced_at);
                 """;
             command.Parameters.AddWithValue("$id", groupChat.Id);
             command.Parameters.AddWithValue("$account_id", groupChat.AccountId);
             command.Parameters.AddWithValue("$account_display_name", groupChat.AccountDisplayName);
             command.Parameters.AddWithValue("$wechat_username", groupChat.WeChatUsername);
+            command.Parameters.AddWithValue("$is_group_chat", groupChat.IsGroupChat ? 1 : 0);
             command.Parameters.AddWithValue("$display_name", groupChat.DisplayName);
             command.Parameters.AddWithValue("$last_message_at", groupChat.LastMessageAt.HasValue ? FormatDateTimeOffset(groupChat.LastMessageAt.Value) : DBNull.Value);
             command.Parameters.AddWithValue("$company_id", (object?)groupChat.CompanyId ?? DBNull.Value);
@@ -814,8 +855,8 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
             using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
-                INSERT INTO todo_entries(id, work_date, project_name, title, content, status, work_hours, is_daily, is_from_scratch_note, source_text, sort_order, notes)
-                VALUES($id, $work_date, $project_name, $title, $content, $status, $work_hours, $is_daily, $is_from_scratch_note, $source_text, $sort_order, $notes);
+                INSERT INTO todo_entries(id, work_date, project_name, title, content, status, work_hours, is_daily, is_from_scratch_note, source_text, sort_order, notes, due_date, priority, labels_json, checklist_json, is_archived, repeat_rule, reminder_minutes)
+                VALUES($id, $work_date, $project_name, $title, $content, $status, $work_hours, $is_daily, $is_from_scratch_note, $source_text, $sort_order, $notes, $due_date, $priority, $labels_json, $checklist_json, $is_archived, $repeat_rule, $reminder_minutes);
                 """;
             command.Parameters.AddWithValue("$id", todoEntry.Id);
             command.Parameters.AddWithValue("$work_date", (object?)FormatDateOnly(todoEntry.WorkDate) ?? DBNull.Value);
@@ -829,6 +870,13 @@ public sealed class ContactManagementSqliteStore : IContactManagementStore
             command.Parameters.AddWithValue("$source_text", todoEntry.SourceText);
             command.Parameters.AddWithValue("$sort_order", todoEntry.SortOrder);
             command.Parameters.AddWithValue("$notes", todoEntry.Notes);
+            command.Parameters.AddWithValue("$due_date", (object?)FormatDateOnly(todoEntry.DueDate) ?? DBNull.Value);
+            command.Parameters.AddWithValue("$priority", (int)todoEntry.Priority);
+            command.Parameters.AddWithValue("$labels_json", SerializeStringList(todoEntry.Labels));
+            command.Parameters.AddWithValue("$checklist_json", SerializeJson(todoEntry.Checklist));
+            command.Parameters.AddWithValue("$is_archived", todoEntry.IsArchived ? 1 : 0);
+            command.Parameters.AddWithValue("$repeat_rule", string.IsNullOrWhiteSpace(todoEntry.RepeatRule) ? "不重复" : todoEntry.RepeatRule);
+            command.Parameters.AddWithValue("$reminder_minutes", todoEntry.ReminderMinutesBeforeDue.HasValue ? todoEntry.ReminderMinutesBeforeDue.Value : DBNull.Value);
             command.ExecuteNonQuery();
         }
     }

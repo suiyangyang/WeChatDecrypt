@@ -7,8 +7,8 @@
 ## 当前能力
 
 - 基于独立 `SQLite` 数据库文件存储全部联系人域数据
-- 支持联系人、公司、项目、关系和微信群聊目录的管理
-- 从本机微信解析结果同步最近有沟通的群聊，并为群聊标注所属公司
+- 支持联系人、公司、项目、关系和微信联系人目录的管理
+- 从本机微信解析结果同步所有可显示的联系人和群聊，并支持按联系人或群聊名称自动分配所属公司（中文和完整拼音序列）、逐项或全部保存归属修改，以及按公司归属、联系人类型组合筛选
 - 页面内部使用左侧 Tab 菜单，默认进入“主页”查看当前数据汇总
 - 联系人、公司、项目、关系页统一为“顶部工具栏 + 下方表格”布局
 - 新建/编辑联系人、公司、项目、关系统一使用弹窗
@@ -84,10 +84,11 @@ dotnet build "Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.
 
 ### 4. `WeChatGroupChats`
 
-- `Id`：群聊目录主键
+- `Id`：微信联系人目录主键
 - `AccountId` / `AccountDisplayName`：微信账号标识和显示名称
-- `WeChatUsername`：群聊唯一标识，必填
-- `DisplayName`：群聊名称，必填
+- `WeChatUsername`：微信联系人或群聊唯一标识，必填
+- `IsGroupChat`：是否为群聊；否则为联系人
+- `DisplayName`：联系人或群聊名称，必填
 - `LastMessageAt`：最近沟通时间，ISO 8601，可为空
 - `CompanyId`：所属公司 ID，可为空
 - `ProjectId`：所属项目 ID，可为空
@@ -113,8 +114,7 @@ dotnet build "Lumine.Fairy.ContactManagement.App\Lumine.Fairy.ContactManagement.
 - 日期优先使用 `yyyy-MM-dd`，时间优先使用 ISO 8601
 - Todo / 客户问题 / 日报 / 随手记 数据请改用 `Lumine.Fairy.TodoList.App` 管理
 
-## 下一步建议
+## 后续维护方向
 
-- 增加搜索、筛选与排序
 - 将关系编辑从 ID 选择扩展为更友好的名称展示与反向引用
 - 把联系人域查询服务接入主程序与相关 Skill

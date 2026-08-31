@@ -238,6 +238,6 @@ public sealed class ContactManagementSqliteStoreTests
         await verifyConnection.OpenAsync();
         await using var verifyCommand = verifyConnection.CreateCommand();
         verifyCommand.CommandText = "SELECT value FROM app_meta WHERE key='schema_version';";
-        Assert.Equal("7", (string?)await verifyCommand.ExecuteScalarAsync());
+        Assert.Equal("10", (string?)await verifyCommand.ExecuteScalarAsync());
     }
 }

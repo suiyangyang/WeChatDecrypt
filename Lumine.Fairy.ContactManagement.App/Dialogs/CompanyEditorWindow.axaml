@@ -9,7 +9,7 @@
 		Height="480"
 		MinWidth="540"
 		MinHeight="460"
-		FontSize="13"
+		FontSize="12"
 		Title="公司编辑"
 		WindowStartupLocation="CenterOwner"
 		CanResize="False"
@@ -17,7 +17,7 @@
 	<Grid RowDefinitions="*,Auto" Margin="18">
 		<ScrollViewer>
 			<StackPanel Spacing="10" Margin="0,0,18,0">
-				<TextBlock FontSize="18" FontWeight="SemiBold" Text="公司信息" />
+				<TextBlock FontSize="16" FontWeight="SemiBold" Text="公司信息" />
 				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
 					<TextBlock VerticalAlignment="Center" Text="公司名称" />
 					<TextBox Grid.Column="1" Width="400" Watermark="公司名称" Text="{Binding Item.Name}" />

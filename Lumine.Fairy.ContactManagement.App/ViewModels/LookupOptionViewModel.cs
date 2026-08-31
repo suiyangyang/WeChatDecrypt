@@ -10,4 +10,6 @@ public sealed partial class LookupOptionViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isSelected;
+
+    public override string ToString() => DisplayName;
 }

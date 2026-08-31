@@ -12,7 +12,7 @@
 		Height="760"
 		MinWidth="540"
 		MinHeight="700"
-		FontSize="13"
+		FontSize="12"
 		Title="联系人编辑"
 		WindowStartupLocation="CenterOwner"
 		CanResize="False"
@@ -23,7 +23,7 @@
 	<Grid RowDefinitions="*,Auto" Margin="18">
 		<ScrollViewer>
 			<StackPanel Spacing="10" Margin="0,0,18,0">
-				<TextBlock FontSize="18" FontWeight="SemiBold" Text="联系人信息" />
+				<TextBlock FontSize="16" FontWeight="SemiBold" Text="联系人信息" />
 				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
 					<TextBlock VerticalAlignment="Center" Text="姓名" />
 					<TextBox Grid.Column="1" Width="400" Watermark="姓名" Text="{Binding Item.FullName}" />
@@ -55,7 +55,7 @@
 					<TextBlock Grid.Row="7" VerticalAlignment="Top" Text="所属公司" Margin="0,6,0,0" />
 					<Border Grid.Row="7" Grid.Column="1" Width="400" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="10">
 						<StackPanel Spacing="8">
-							<TextBox Height="30" Watermark="筛选公司" TextChanged="CompanyFilterTextBox_TextChanged" />
+							<TextBox Height="28" Watermark="筛选公司" TextChanged="CompanyFilterTextBox_TextChanged" />
 							<ItemsControl ItemsSource="{Binding SelectedCompanyOptions}">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>
@@ -90,7 +90,7 @@
 					<TextBlock Grid.Row="8" VerticalAlignment="Top" Text="参与项目" Margin="0,6,0,0" />
 					<Border Grid.Row="8" Grid.Column="1" Width="400" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="8" Padding="10">
 						<StackPanel Spacing="8">
-							<TextBox Height="30" Watermark="筛选项目" TextChanged="ProjectFilterTextBox_TextChanged" />
+							<TextBox Height="28" Watermark="筛选项目" TextChanged="ProjectFilterTextBox_TextChanged" />
 							<ItemsControl ItemsSource="{Binding SelectedProjectOptions}">
 								<ItemsControl.ItemsPanel>
 									<ItemsPanelTemplate>

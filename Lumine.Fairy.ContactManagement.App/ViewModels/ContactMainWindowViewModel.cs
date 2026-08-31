@@ -11,6 +11,12 @@ namespace Lumine.Fairy.ContactManagement.App.ViewModels;
 
 public sealed partial class ContactMainWindowViewModel : ObservableObject
 {
+    private const string AllFilterId = "all";
+    private const string AssignedFilterId = "assigned";
+    private const string UnassignedFilterId = "unassigned";
+    private const string GroupChatFilterId = "group-chat";
+    private const string ContactFilterId = "contact";
+
     private readonly ContactManagementWorkspaceService _workspaceService;
     private readonly IDataImportService _dataImportService;
     private readonly IDataExportService _dataExportService;
@@ -41,9 +47,23 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         RelationshipTypeOptions = Enum.GetValues<ContactRelationshipType>();
         EntityKindOptions = Enum.GetValues<EntityKind>();
         RelationshipLinkTypeOptions = Enum.GetValues<RelationshipLinkType>();
+        GroupChatAssignmentFilterOptions =
+        [
+            new LookupOptionViewModel { Id = AllFilterId, DisplayName = "全部" },
+            new LookupOptionViewModel { Id = AssignedFilterId, DisplayName = "已分配" },
+            new LookupOptionViewModel { Id = UnassignedFilterId, DisplayName = "未分配" }
+        ];
+        GroupChatTypeFilterOptions =
+        [
+            new LookupOptionViewModel { Id = AllFilterId, DisplayName = "全部类型" },
+            new LookupOptionViewModel { Id = GroupChatFilterId, DisplayName = "群聊" },
+            new LookupOptionViewModel { Id = ContactFilterId, DisplayName = "联系人" }
+        ];
+        SelectedGroupChatAssignmentFilter = GroupChatAssignmentFilterOptions[0];
+        SelectedGroupChatTypeFilter = GroupChatTypeFilterOptions[0];
 
         ApplySnapshot(initialSnapshot);
-        StatusText = "SQLite 数据已加载，可以开始维护联系人、公司、项目、微信群聊，并支持联系人域 JSON / Excel 导入导出。";
+        StatusText = "SQLite 数据已加载，可以开始维护联系人、公司、项目、微信联系人，并支持联系人域 JSON / Excel 导入导出。";
     }
 
     public string DataDirectoryText { get; }
@@ -73,10 +93,10 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     private string _groupChatFilterText = string.Empty;
 
     [ObservableProperty]
-    private int _selectedGroupChatLookbackDays = 30;
+    private LookupOptionViewModel? _selectedGroupChatAssignmentFilter;
 
     [ObservableProperty]
-    private bool _showOnlyUnassignedGroupChats;
+    private LookupOptionViewModel? _selectedGroupChatTypeFilter;
 
     [ObservableProperty]
     private string _importFilePath = string.Empty;
@@ -147,6 +167,10 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public IReadOnlyList<RelationshipLinkType> RelationshipLinkTypeOptions { get; }
 
+    public IReadOnlyList<LookupOptionViewModel> GroupChatAssignmentFilterOptions { get; }
+
+    public IReadOnlyList<LookupOptionViewModel> GroupChatTypeFilterOptions { get; }
+
     public ObservableCollection<ImportConflictItem> ImportConflicts { get; } = [];
 
     public ObservableCollection<ImportConflictItem> ImportErrors { get; } = [];
@@ -205,7 +229,12 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public string ProjectListSummaryText => BuildFilterSummaryText(FilteredProjects.Count, Projects.Count, "个项目", ProjectFilterText);
 
-    public string GroupChatListSummaryText => BuildFilterSummaryText(FilteredGroupChats.Count, GroupChats.Count, "个群聊", GroupChatFilterText);
+    public string GroupChatListSummaryText => BuildFilterSummaryText(
+        FilteredGroupChats.Count,
+        GroupChats.Count(item => item.IsActive),
+        "个微信联系人",
+        GroupChatFilterText,
+        HasActiveGroupChatFilters);
 
     public string ContactEmptyStateText => BuildEmptyStateText("联系人", ContactFilterText);
 
@@ -213,9 +242,11 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public string ProjectEmptyStateText => BuildEmptyStateText("项目", ProjectFilterText);
 
-    public string GroupChatEmptyStateText => GroupChats.Count == 0
-        ? "尚未同步微信群聊，请点击“刷新最近群聊”。"
-        : BuildEmptyStateText("微信群聊", GroupChatFilterText);
+    public string GroupChatEmptyStateText => GroupChats.All(item => !item.IsActive)
+        ? "尚未同步微信联系人，请点击“刷新联系人”。"
+        : HasActiveGroupChatFilters
+            ? "当前筛选条件下没有匹配的微信联系人。"
+            : BuildEmptyStateText("微信联系人", GroupChatFilterText);
 
     public string ImportDecisionHint => HasImportErrors
         ? "存在错误项，需先修正后才能提交导入。"
@@ -260,8 +291,8 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     public async Task SaveGroupChatDraftAsync(WeChatGroupChatItemViewModel draft)
     {
-        if (_groupChatDirectoryService is null) throw new InvalidOperationException("微信群聊目录服务尚未初始化。");
-        await SaveDraftAsync(draft, draft.ToModel(), SelectionTarget.GroupChat, $"群聊“{draft.DisplayName}”的公司归属已保存。", _groupChatDirectoryService.UpsertAsync);
+        if (_groupChatDirectoryService is null) throw new InvalidOperationException("微信联系人目录服务尚未初始化。");
+        await SaveDraftAsync(draft, draft.ToModel(), SelectionTarget.GroupChat, $"微信联系人“{draft.DisplayName}”的公司归属已保存。", _groupChatDirectoryService.UpsertAsync);
     }
 
     public Task SaveRelationshipDraftAsync(RelationshipLinkItemViewModel draft)
@@ -272,15 +303,106 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
     {
         if (_groupChatDirectoryService is null)
         {
-            StatusText = "微信群聊目录服务尚未初始化。";
+            StatusText = "微信联系人目录服务尚未初始化。";
             return;
         }
 
         await ExecuteBusyAsync(async () =>
         {
-            var snapshot = await _groupChatDirectoryService.RefreshAsync(TimeSpan.FromDays(Math.Clamp(SelectedGroupChatLookbackDays, 1, 365)));
+            var snapshot = await _groupChatDirectoryService.RefreshAsync();
             ApplySnapshot(snapshot);
-            StatusText = $"已同步 {GroupChats.Count} 个最近微信群聊。";
+            StatusText = $"已同步 {GroupChats.Count(item => item.IsActive)} 个微信联系人和群聊。";
+        });
+    }
+
+    [RelayCommand]
+    private async Task SaveAllAsync()
+    {
+        if (_groupChatDirectoryService is null)
+        {
+            StatusText = "微信联系人目录服务尚未初始化。";
+            return;
+        }
+
+        var modifiedGroupChats = GroupChats
+            .Where(static item => item.HasUnsavedChanges)
+            .ToList();
+        if (modifiedGroupChats.Count == 0)
+        {
+            StatusText = "当前没有待保存的修改。";
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            ContactManagementSnapshot? snapshot = null;
+            foreach (var groupChat in modifiedGroupChats)
+            {
+                snapshot = await _groupChatDirectoryService.UpsertAsync(groupChat.ToModel());
+            }
+
+            if (snapshot is not null)
+            {
+                ApplySnapshot(snapshot);
+            }
+
+            StatusText = $"已保存 {modifiedGroupChats.Count} 个微信联系人修改。";
+        });
+    }
+
+    [RelayCommand]
+    private async Task AutoAssignGroupChatCompaniesAsync()
+    {
+        if (_groupChatDirectoryService is null)
+        {
+            StatusText = "微信联系人目录服务尚未初始化。";
+            return;
+        }
+
+        await ExecuteBusyAsync(async () =>
+        {
+            var activeGroupChats = GroupChats.Where(static item => item.IsActive).ToList();
+            var unassignedGroupChats = activeGroupChats
+                .Where(static item => string.IsNullOrWhiteSpace(item.CompanyId))
+                .ToList();
+            var companyOptions = Companies
+                .Where(static company => company.IsActive && !string.IsNullOrWhiteSpace(company.Name))
+                .Select(static company => new LookupOptionViewModel
+                {
+                    Id = company.Id,
+                    DisplayName = company.DisplayName
+                })
+                .ToList();
+
+            if (companyOptions.Count == 0)
+            {
+                StatusText = "当前没有可用于自动匹配的公司。";
+                return;
+            }
+
+            var assignments = unassignedGroupChats
+                .Select(item => (Item: item, Company: CompanyOptionSearch.FindBestMatch(item.DisplayName, companyOptions)))
+                .Where(static item => item.Company is not null)
+                .Select(static item => (item.Item, Company: item.Company!))
+                .ToList();
+
+            ContactManagementSnapshot? snapshot = null;
+            foreach (var assignment in assignments)
+            {
+                var companyOption = assignment.Item.CompanyOptions.First(option =>
+                    string.Equals(option.Id, assignment.Company.Id, StringComparison.OrdinalIgnoreCase));
+                assignment.Item.SelectedCompanyOption = companyOption;
+                snapshot = await _groupChatDirectoryService.UpsertAsync(assignment.Item.ToModel());
+            }
+
+            if (snapshot is not null)
+            {
+                ApplySnapshot(snapshot);
+            }
+
+            var alreadyAssignedCount = activeGroupChats.Count - unassignedGroupChats.Count;
+            var unmatchedCount = unassignedGroupChats.Count - assignments.Count;
+            StatusText = $"自动分配完成：已分配 {assignments.Count} 个，已有归属 {alreadyAssignedCount} 个，未匹配 {unmatchedCount} 个。";
         });
     }
 
@@ -570,16 +692,14 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
     }
 
-    partial void OnShowOnlyUnassignedGroupChatsChanged(bool value)
+    partial void OnSelectedGroupChatAssignmentFilterChanged(LookupOptionViewModel? value)
     {
-        RefreshFilteredGroupChats();
-        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+        RefreshGroupChatFilterAndSelection();
     }
 
-    partial void OnSelectedGroupChatLookbackDaysChanged(int value)
+    partial void OnSelectedGroupChatTypeFilterChanged(LookupOptionViewModel? value)
     {
-        RefreshFilteredGroupChats();
-        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+        RefreshGroupChatFilterAndSelection();
     }
 
     partial void OnSelectedMainTabIndexChanged(int value)
@@ -679,6 +799,11 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         ReplaceCollection(Contacts, snapshot.Contacts.Select(ContactItemViewModel.FromModel));
         ReplaceCollection(Companies, snapshot.Companies.Select(CompanyItemViewModel.FromModel));
         ReplaceCollection(Projects, snapshot.Projects.Select(ProjectItemViewModel.FromModel));
+
+        // Group chat rows resolve their selected company while being created, so
+        // company lookup options must be ready before the rows are materialized.
+        RefreshLookupOptions();
+
         ReplaceCollection(GroupChats, snapshot.WeChatGroupChats.Select(item => WeChatGroupChatItemViewModel.FromModel(item, CompanyOptions)));
         ReplaceCollection(RelationshipLinks, snapshot.RelationshipLinks.Select(RelationshipLinkItemViewModel.FromModel));
 
@@ -686,8 +811,6 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         RefreshFilteredCompanies();
         RefreshFilteredProjects();
         RefreshFilteredGroupChats();
-
-        RefreshLookupOptions();
 
         SelectedContact = ResolveSelection(FilteredContacts, item => item.Id, SelectedContact?.Id, preferredId, selectionTarget == SelectionTarget.Contact);
         SelectedCompany = ResolveSelection(FilteredCompanies, item => item.Id, SelectedCompany?.Id, preferredId, selectionTarget == SelectionTarget.Company);
@@ -767,20 +890,32 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
 
     private void RefreshFilteredGroupChats()
     {
-        IEnumerable<WeChatGroupChatItemViewModel> results = GroupChats;
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Clamp(SelectedGroupChatLookbackDays, 1, 365));
-        results = results.Where(item => item.LastMessageAt is null || item.LastMessageAt >= cutoff);
-        if (ShowOnlyUnassignedGroupChats)
+        IEnumerable<WeChatGroupChatItemViewModel> results = GroupChats.Where(item => item.IsActive);
+
+        if (string.Equals(SelectedGroupChatAssignmentFilter?.Id, AssignedFilterId, StringComparison.OrdinalIgnoreCase))
         {
-            results = results.Where(item => string.IsNullOrWhiteSpace(item.CompanyId));
+            results = results.Where(static item => !string.IsNullOrWhiteSpace(item.CompanyId));
+        }
+        else if (string.Equals(SelectedGroupChatAssignmentFilter?.Id, UnassignedFilterId, StringComparison.OrdinalIgnoreCase))
+        {
+            results = results.Where(static item => string.IsNullOrWhiteSpace(item.CompanyId));
+        }
+
+        if (string.Equals(SelectedGroupChatTypeFilter?.Id, GroupChatFilterId, StringComparison.OrdinalIgnoreCase))
+        {
+            results = results.Where(static item => item.IsGroupChat);
+        }
+        else if (string.Equals(SelectedGroupChatTypeFilter?.Id, ContactFilterId, StringComparison.OrdinalIgnoreCase))
+        {
+            results = results.Where(static item => !item.IsGroupChat);
         }
 
         if (!string.IsNullOrWhiteSpace(GroupChatFilterText))
         {
             var keyword = GroupChatFilterText.Trim();
             results = results.Where(item => item.DisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase)
-                || item.WeChatUsername.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                 || item.AccountDisplayName.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                || item.TypeText.Contains(keyword, StringComparison.OrdinalIgnoreCase)
                 || item.CompanyName.Contains(keyword, StringComparison.OrdinalIgnoreCase));
         }
 
@@ -816,9 +951,19 @@ public sealed partial class ContactMainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(GroupChatEmptyStateText));
     }
 
-    private static string BuildFilterSummaryText(int filteredCount, int totalCount, string unitText, string filterText)
+    private bool HasActiveGroupChatFilters => !string.IsNullOrWhiteSpace(GroupChatFilterText)
+        || !string.Equals(SelectedGroupChatAssignmentFilter?.Id, AllFilterId, StringComparison.OrdinalIgnoreCase)
+        || !string.Equals(SelectedGroupChatTypeFilter?.Id, AllFilterId, StringComparison.OrdinalIgnoreCase);
+
+    private void RefreshGroupChatFilterAndSelection()
     {
-        return string.IsNullOrWhiteSpace(filterText)
+        RefreshFilteredGroupChats();
+        SelectedGroupChat = ResolveSelection(FilteredGroupChats, item => item.Id, SelectedGroupChat?.Id, null, false);
+    }
+
+    private static string BuildFilterSummaryText(int filteredCount, int totalCount, string unitText, string filterText, bool hasAdvancedFilter = false)
+    {
+        return !hasAdvancedFilter && string.IsNullOrWhiteSpace(filterText)
             ? $"共 {totalCount} {unitText}"
             : $"筛选结果 {filteredCount} / {totalCount} {unitText}";
     }

@@ -198,8 +198,7 @@ public partial class ProjectEditorWindow : Window
         IEnumerable<LookupOptionViewModel> items = source;
         if (!string.IsNullOrWhiteSpace(keyword))
         {
-            var trimmedKeyword = keyword.Trim();
-            items = items.Where(item => item.DisplayName.Contains(trimmedKeyword, StringComparison.OrdinalIgnoreCase));
+            items = items.Where(item => CompanyOptionSearch.Matches(item.DisplayName, keyword));
         }
 
         ReplaceCollection(target, items.OrderBy(static item => item.DisplayName, StringComparer.OrdinalIgnoreCase));

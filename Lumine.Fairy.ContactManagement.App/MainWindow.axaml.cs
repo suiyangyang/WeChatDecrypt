@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Lumine.Fairy.ContactManagement.App.Dialogs;
 using Lumine.Fairy.ContactManagement.App.ViewModels;
 
@@ -12,6 +13,7 @@ public partial class MainWindow : UserControl
     public MainWindow()
     {
         InitializeComponent();
+        AddHandler(TextBox.TextChangedEvent, GroupChatCompany_TextChanged);
     }
 
     private async void PickImportFile_Click(object? sender, RoutedEventArgs e)
@@ -190,6 +192,24 @@ public partial class MainWindow : UserControl
             && DataContext is ContactMainWindowViewModel viewModel)
         {
             await viewModel.SaveGroupChatAsync(item);
+        }
+    }
+
+    private static void GroupChatCompany_TextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (e.Source is TextBox { IsFocused: true } textBox
+            && textBox.FindAncestorOfType<ComboBox>() is { DataContext: WeChatGroupChatItemViewModel } comboBox
+            && comboBox.SelectedItem is null)
+        {
+            comboBox.SetCurrentValue(ComboBox.IsDropDownOpenProperty, true);
+        }
+    }
+
+    private static void GroupChatCompany_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ComboBox { DataContext: WeChatGroupChatItemViewModel item, SelectedItem: LookupOptionViewModel option })
+        {
+            item.CompanyId = string.IsNullOrWhiteSpace(option.Id) ? null : option.Id;
         }
     }
 

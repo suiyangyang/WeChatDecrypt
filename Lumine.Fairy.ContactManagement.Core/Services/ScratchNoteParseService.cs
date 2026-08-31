@@ -44,6 +44,13 @@ public sealed partial class ScratchNoteParseService
                 continue;
             }
 
+            if (line.Equals("每日 Todo", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("每日 Todo：", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("每日 Todo:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             if (TryParseDate(line, out var parsedDate))
             {
                 currentDate = parsedDate;

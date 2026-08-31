@@ -483,6 +483,7 @@ public sealed class ContactDomainDataImportService : IDataImportService
         AccountId = item.AccountId,
         AccountDisplayName = item.AccountDisplayName,
         WeChatUsername = item.WeChatUsername,
+        IsGroupChat = item.IsGroupChat,
         DisplayName = item.DisplayName,
         LastMessageAt = item.LastMessageAt,
         CompanyId = item.CompanyId,

@@ -336,6 +336,7 @@ internal static class ExcelContactManagementWorkbookMapper
                 AccountId = GetString(row, headers, "AccountId"),
                 AccountDisplayName = GetString(row, headers, "AccountDisplayName"),
                 WeChatUsername = username,
+                IsGroupChat = ParseBool(GetString(row, headers, "IsGroupChat"), defaultValue: true),
                 DisplayName = GetString(row, headers, "DisplayName").NullIfWhiteSpace() ?? username,
                 LastMessageAt = lastMessageAt,
                 CompanyId = GetString(row, headers, "CompanyId").NullIfWhiteSpace(),
@@ -390,12 +391,22 @@ internal static class ExcelContactManagementWorkbookMapper
                 Title = GetString(row, headers, "Title"),
                 Content = GetString(row, headers, "Content"),
                 Status = status,
+                Priority = TryParseEnum(GetString(row, headers, "Priority"), TodoPriority.Normal, out TodoPriority priority)
+                    ? priority
+                    : TodoPriority.Normal,
+                DueDate = TryParseNullableDateOnly(GetString(row, headers, "DueDate"), out var dueDate) ? dueDate : null,
                 WorkHours = workHours,
                 IsDaily = ParseBool(GetString(row, headers, "IsDaily"), defaultValue: false),
                 IsFromScratchNote = ParseBool(GetString(row, headers, "IsFromScratchNote"), defaultValue: false),
                 SourceText = GetString(row, headers, "SourceText"),
                 SortOrder = ParseInt(GetString(row, headers, "SortOrder"), 0),
-                Notes = GetString(row, headers, "Notes")
+                Notes = GetString(row, headers, "Notes"),
+                Labels = SplitValues(GetString(row, headers, "Labels")),
+                IsArchived = ParseBool(GetString(row, headers, "IsArchived"), defaultValue: false),
+                RepeatRule = string.IsNullOrWhiteSpace(GetString(row, headers, "RepeatRule")) ? "不重复" : GetString(row, headers, "RepeatRule"),
+                ReminderMinutesBeforeDue = int.TryParse(GetString(row, headers, "ReminderMinutesBeforeDue"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var reminderMinutes)
+                    ? reminderMinutes
+                    : null
             });
         }
 
@@ -604,7 +615,7 @@ internal static class ExcelContactManagementWorkbookMapper
     private static void WriteWeChatGroupChats(XLWorkbook workbook, IReadOnlyList<WeChatGroupChatProfile> items)
     {
         var worksheet = workbook.Worksheets.Add(WeChatGroupChatsSheetName);
-        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
+        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "IsGroupChat", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
         WriteHeaders(worksheet, headers);
         for (var i = 0; i < items.Count; i++)
         {
@@ -614,12 +625,13 @@ internal static class ExcelContactManagementWorkbookMapper
             worksheet.Cell(row, 2).Value = item.AccountId;
             worksheet.Cell(row, 3).Value = item.AccountDisplayName;
             worksheet.Cell(row, 4).Value = item.WeChatUsername;
-            worksheet.Cell(row, 5).Value = item.DisplayName;
-            worksheet.Cell(row, 6).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
-            worksheet.Cell(row, 7).Value = item.CompanyId ?? string.Empty;
-            worksheet.Cell(row, 8).Value = item.ProjectId ?? string.Empty;
-            worksheet.Cell(row, 9).Value = item.IsActive;
-            worksheet.Cell(row, 10).Value = item.LastSyncedAt.ToString("O");
+            worksheet.Cell(row, 5).Value = item.IsGroupChat;
+            worksheet.Cell(row, 6).Value = item.DisplayName;
+            worksheet.Cell(row, 7).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
+            worksheet.Cell(row, 8).Value = item.CompanyId ?? string.Empty;
+            worksheet.Cell(row, 9).Value = item.ProjectId ?? string.Empty;
+            worksheet.Cell(row, 10).Value = item.IsActive;
+            worksheet.Cell(row, 11).Value = item.LastSyncedAt.ToString("O");
         }
         worksheet.Columns().AdjustToContents();
     }
@@ -655,7 +667,7 @@ internal static class ExcelContactManagementWorkbookMapper
     private static void WriteTodoEntries(XLWorkbook workbook, IReadOnlyList<TodoEntry> items)
     {
         var worksheet = workbook.Worksheets.Add(TodoEntriesSheetName);
-        var headers = new[] { "Id", "WorkDate", "ProjectName", "Title", "Content", "Status", "WorkHours", "IsDaily", "IsFromScratchNote", "SourceText", "SortOrder", "Notes" };
+        var headers = new[] { "Id", "WorkDate", "ProjectName", "Title", "Content", "Status", "Priority", "DueDate", "WorkHours", "IsDaily", "IsFromScratchNote", "SourceText", "SortOrder", "Notes", "Labels", "IsArchived", "RepeatRule", "ReminderMinutesBeforeDue" };
         WriteHeaders(worksheet, headers);
         for (var i = 0; i < items.Count; i++)
         {
@@ -667,12 +679,18 @@ internal static class ExcelContactManagementWorkbookMapper
             worksheet.Cell(row, 4).Value = item.Title;
             worksheet.Cell(row, 5).Value = item.Content;
             worksheet.Cell(row, 6).Value = item.Status.ToString();
-            worksheet.Cell(row, 7).Value = item.WorkHours?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
-            worksheet.Cell(row, 8).Value = item.IsDaily;
-            worksheet.Cell(row, 9).Value = item.IsFromScratchNote;
-            worksheet.Cell(row, 10).Value = item.SourceText;
-            worksheet.Cell(row, 11).Value = item.SortOrder;
-            worksheet.Cell(row, 12).Value = item.Notes;
+            worksheet.Cell(row, 7).Value = item.Priority.ToString();
+            worksheet.Cell(row, 8).Value = item.DueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty;
+            worksheet.Cell(row, 9).Value = item.WorkHours?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            worksheet.Cell(row, 10).Value = item.IsDaily;
+            worksheet.Cell(row, 11).Value = item.IsFromScratchNote;
+            worksheet.Cell(row, 12).Value = item.SourceText;
+            worksheet.Cell(row, 13).Value = item.SortOrder;
+            worksheet.Cell(row, 14).Value = item.Notes;
+            worksheet.Cell(row, 15).Value = JoinValues(item.Labels);
+            worksheet.Cell(row, 16).Value = item.IsArchived;
+            worksheet.Cell(row, 17).Value = item.RepeatRule;
+            worksheet.Cell(row, 18).Value = item.ReminderMinutesBeforeDue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
         }
         worksheet.Columns().AdjustToContents();
     }

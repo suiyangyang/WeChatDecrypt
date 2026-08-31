@@ -6,7 +6,7 @@ public sealed class ContactManagementStorageOptions
 
     public string DatabaseFileName { get; set; } = "contact-management.db";
 
-    public int SchemaVersion { get; set; } = 7;
+    public int SchemaVersion { get; set; } = 10;
 
     public string DatabaseFilePath => Path.Combine(BaseDirectoryPath, DatabaseFileName);
 

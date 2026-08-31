@@ -17,13 +17,21 @@ public sealed class WeChatGroupChatDirectoryService
         _provider = provider ?? throw new ArgumentNullException(nameof(provider));
     }
 
-    public async Task<ContactManagementSnapshot> RefreshAsync(TimeSpan lookback, CancellationToken cancellationToken = default)
+    public async Task<ContactManagementSnapshot> RefreshAsync(CancellationToken cancellationToken = default)
     {
-        if (lookback <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(lookback));
-
         var snapshot = await _store.LoadAsync(cancellationToken);
-        var groupChats = snapshot.WeChatGroupChats.ToDictionary(GetIdentity, StringComparer.OrdinalIgnoreCase);
-        foreach (var candidate in await _provider.GetRecentAsync(lookback, cancellationToken))
+        var groupChats = snapshot.WeChatGroupChats
+            .GroupBy(GetIdentity, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+        foreach (var item in groupChats.Values)
+        {
+            // A refresh is a reconciliation with the current WeChat catalog. Keep
+            // old rows for company mappings, but do not present them as visible
+            // contacts after they disappear from the source catalog.
+            item.IsActive = false;
+        }
+
+        foreach (var candidate in await _provider.GetAllAsync(cancellationToken))
         {
             var identity = GetIdentity(candidate.AccountId, candidate.WeChatUsername);
             if (!groupChats.TryGetValue(identity, out var item))
@@ -34,11 +42,13 @@ public sealed class WeChatGroupChatDirectoryService
                     AccountId = candidate.AccountId,
                     AccountDisplayName = candidate.AccountDisplayName,
                     WeChatUsername = candidate.WeChatUsername,
+                    IsGroupChat = candidate.IsGroupChat,
                     IsActive = true
                 };
                 groupChats.Add(identity, item);
             }
 
+            item.IsGroupChat = candidate.IsGroupChat;
             var candidateDisplayName = candidate.DisplayName?.Trim();
             if (!string.IsNullOrWhiteSpace(candidateDisplayName)
                 && (!candidateDisplayName.Equals("未知群聊", StringComparison.Ordinal)

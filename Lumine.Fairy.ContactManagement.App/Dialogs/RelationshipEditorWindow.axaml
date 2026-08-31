@@ -11,7 +11,7 @@
 		Height="560"
 		MinWidth="580"
 		MinHeight="520"
-		FontSize="13"
+		FontSize="12"
 		Title="关系编辑"
 		WindowStartupLocation="CenterOwner"
 		CanResize="False"
@@ -22,7 +22,7 @@
 	<Grid RowDefinitions="*,Auto" Margin="18">
 		<ScrollViewer>
 			<StackPanel Spacing="10" Margin="0,0,18,0">
-				<TextBlock FontSize="18" FontWeight="SemiBold" Text="关系信息" />
+				<TextBlock FontSize="16" FontWeight="SemiBold" Text="关系信息" />
 
 				<Grid ColumnDefinitions="92,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10">
 					<TextBlock VerticalAlignment="Center" Text="来源类型" />

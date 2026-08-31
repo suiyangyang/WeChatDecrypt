@@ -11,6 +11,7 @@ public sealed class WeChatGroupChatProfile
     public string AccountDisplayName { get; set; } = string.Empty;
     public string WeChatUsername { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
+    public bool IsGroupChat { get; set; } = true;
     public DateTimeOffset? LastMessageAt { get; set; }
     public string? CompanyId { get; set; }
     public string? ProjectId { get; set; }

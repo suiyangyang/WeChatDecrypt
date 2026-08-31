@@ -7,7 +7,7 @@
 		x:Name="RootWindow"
 		x:Class="Lumine.Fairy.ContactManagement.App.MainWindow"
 		x:DataType="vm:ContactMainWindowViewModel"
-		FontSize="13"
+		FontSize="12"
 		mc:Ignorable="d">
 	<Grid RowDefinitions="Auto,*,Auto" Margin="14">
 		<Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
@@ -15,7 +15,7 @@
 				<PathIcon Width="38" Height="38" Data="M10,7.5H22C23.38,7.5 24.5,8.62 24.5,10V22C24.5,23.38 23.38,24.5 22,24.5H10C8.62,24.5 7.5,23.38 7.5,22V10C7.5,8.62 8.62,7.5 10,7.5Z M14,10.8A2.2,2.2 0 1 0 14,15.2A2.2,2.2 0 1 0 14,10.8Z M10.5,20.5C10.95,18.35 12.1,17.25 14,17.25C15.9,17.25 17.05,18.35 17.5,20.5M19,12H22" Foreground="#2F7BF6" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 			</Border>
 			<StackPanel Grid.Column="1" Spacing="4">
-				<TextBlock FontSize="22" FontWeight="SemiBold" Text="联系人 / 公司 / 项目管理" />
+				<TextBlock FontSize="16" FontWeight="SemiBold" Text="联系人 / 公司 / 项目管理" />
 				<TextBlock FontSize="12" Foreground="#6B7280" Text="联系人域数据维护与 JSON / Excel 导入导出" />
 			</StackPanel>
 			<StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -29,7 +29,7 @@
 					<StackPanel Spacing="10">
 						<Border Padding="12" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
 							<StackPanel Spacing="6">
-								<TextBlock FontSize="18" FontWeight="SemiBold" Text="当前数据汇总" />
+								<TextBlock FontSize="16" FontWeight="SemiBold" Text="当前数据汇总" />
 								<TextBlock FontSize="12" Foreground="#6B7280" Text="默认展示联系人域核心统计。" TextWrapping="Wrap" />
 							</StackPanel>
 						</Border>
@@ -38,19 +38,19 @@
 							<Border Padding="12" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
 								<StackPanel Spacing="6">
 									<TextBlock FontSize="12" Foreground="#64748B" Text="联系人" />
-									<TextBlock FontSize="20" FontWeight="Bold" Text="{Binding Statistics.ContactCount}" />
+									<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding Statistics.ContactCount}" />
 								</StackPanel>
 							</Border>
 							<Border Grid.Column="1" Padding="12" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
 								<StackPanel Spacing="6">
 									<TextBlock FontSize="12" Foreground="#64748B" Text="公司" />
-									<TextBlock FontSize="20" FontWeight="Bold" Text="{Binding Statistics.CompanyCount}" />
+									<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding Statistics.CompanyCount}" />
 								</StackPanel>
 							</Border>
 							<Border Grid.Column="2" Padding="12" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
 								<StackPanel Spacing="6">
 									<TextBlock FontSize="12" Foreground="#64748B" Text="项目" />
-									<TextBlock FontSize="20" FontWeight="Bold" Text="{Binding Statistics.ProjectCount}" />
+									<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding Statistics.ProjectCount}" />
 								</StackPanel>
 							</Border>
 						</Grid>
@@ -191,17 +191,29 @@
 					</Border>
 				</Grid>
 			</TabItem>
-			<TabItem Header="微信群聊" Width="90" FontSize="12">
+			<TabItem Header="微信联系人" Width="90" FontSize="12">
 				<Grid Margin="0,4,0,0" RowDefinitions="Auto,*" RowSpacing="6">
 					<Border Padding="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="10">
-						<Grid ColumnDefinitions="Auto,Auto,Auto,220,*" ColumnSpacing="8">
-							<Button Content="刷新最近群聊" Command="{Binding RefreshGroupChatsCommand}" MinWidth="92" Height="28" />
-							<TextBlock Grid.Column="1" VerticalAlignment="Center" Text="最近" />
-							<TextBox Grid.Column="2" Width="58" Height="28" Text="{Binding SelectedGroupChatLookbackDays}" />
-							<TextBlock Grid.Column="3" VerticalAlignment="Center" Foreground="#64748B" Text="天" />
-							<StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-								<CheckBox VerticalAlignment="Center" Content="只看未分配公司" IsChecked="{Binding ShowOnlyUnassignedGroupChats}" />
-								<TextBox Width="180" Height="28" Watermark="筛选群聊" Text="{Binding GroupChatFilterText, UpdateSourceTrigger=PropertyChanged}" />
+						<Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+							<Button Content="自动分配公司" Command="{Binding AutoAssignGroupChatCompaniesCommand}" MinWidth="104" Height="28" ToolTip.Tip="按联系人或群聊名称严格匹配中文或完整拼音；已有归属不会覆盖" />
+							<Button Grid.Column="1" Content="全部保存" Command="{Binding SaveAllCommand}" MinWidth="78" Height="28" ToolTip.Tip="保存当前所有已修改但尚未保存的微信联系人归属" />
+							<Button Grid.Column="2" Content="刷新联系人" Command="{Binding RefreshGroupChatsCommand}" MinWidth="92" Height="28" />
+							<StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+								<ComboBox Width="92" Height="28" ItemsSource="{Binding GroupChatAssignmentFilterOptions}" SelectedItem="{Binding SelectedGroupChatAssignmentFilter}" ToolTip.Tip="按公司归属筛选">
+									<ComboBox.ItemTemplate>
+										<DataTemplate x:DataType="vm:LookupOptionViewModel">
+											<TextBlock Text="{Binding DisplayName}" />
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+								<ComboBox Width="88" Height="28" ItemsSource="{Binding GroupChatTypeFilterOptions}" SelectedItem="{Binding SelectedGroupChatTypeFilter}" ToolTip.Tip="按联系人类型筛选">
+									<ComboBox.ItemTemplate>
+										<DataTemplate x:DataType="vm:LookupOptionViewModel">
+											<TextBlock Text="{Binding DisplayName}" />
+										</DataTemplate>
+									</ComboBox.ItemTemplate>
+								</ComboBox>
+								<TextBox Width="180" Height="28" Watermark="筛选联系人或群聊" Text="{Binding GroupChatFilterText, UpdateSourceTrigger=PropertyChanged}" />
 								<TextBlock FontSize="11" VerticalAlignment="Center" Foreground="#64748B" Text="{Binding GroupChatListSummaryText}" />
 							</StackPanel>
 						</Grid>
@@ -209,9 +221,9 @@
 
 					<Border Grid.Row="1" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="10">
 						<Grid RowDefinitions="Auto,*">
-							<Grid ColumnDefinitions="1.55*,1.6*,1.5*,1.15*,0.65*" ColumnSpacing="8" Margin="10,8,10,4">
-								<TextBlock FontSize="12" FontWeight="SemiBold" Text="群聊" />
-								<TextBlock Grid.Column="1" FontSize="12" FontWeight="SemiBold" Text="账号 / 标识" />
+							<Grid ColumnDefinitions="1.8*,0.8*,1.35*,1.15*,0.65*" ColumnSpacing="8" Margin="10,8,10,4">
+								<TextBlock FontSize="12" FontWeight="SemiBold" Text="联系人 / 群聊" />
+								<TextBlock Grid.Column="1" FontSize="12" FontWeight="SemiBold" Text="类型" />
 								<TextBlock Grid.Column="2" FontSize="12" FontWeight="SemiBold" Text="最近沟通" />
 								<TextBlock Grid.Column="3" FontSize="12" FontWeight="SemiBold" Text="所属公司" />
 								<TextBlock Grid.Column="4" FontSize="12" FontWeight="SemiBold" Text="操作" />
@@ -220,18 +232,25 @@
 								<ListBox.ItemTemplate>
 									<DataTemplate x:DataType="vm:WeChatGroupChatItemViewModel">
 										<Border Padding="10,6" BorderBrush="#F1F5F9" BorderThickness="0,1,0,0">
-											<Grid ColumnDefinitions="1.55*,1.6*,1.5*,1.15*,0.65*" ColumnSpacing="8">
+											<Grid ColumnDefinitions="1.8*,0.8*,1.35*,1.15*,0.65*" ColumnSpacing="8">
 												<TextBlock FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Text="{Binding DisplayName}" MaxLines="1" TextTrimming="CharacterEllipsis" />
-												<TextBlock Grid.Column="1" FontSize="11" VerticalAlignment="Center" Foreground="#64748B" Text="{Binding IdentityText}" MaxLines="1" TextTrimming="CharacterEllipsis" />
+												<TextBlock Grid.Column="1" FontSize="12" VerticalAlignment="Center" Text="{Binding TypeText}" />
 												<TextBlock Grid.Column="2" FontSize="12" VerticalAlignment="Center" Text="{Binding LastMessageAtText}" />
-													<ComboBox Grid.Column="3" ItemsSource="{Binding CompanyOptions}" SelectedItem="{Binding SelectedCompanyOption, Mode=TwoWay}" Width="140" Height="28">
+																			<ComboBox Grid.Column="3" ItemsSource="{Binding FilteredCompanyOptions}" SelectedItem="{Binding SelectedCompanyOption, Mode=TwoWay}" Text="{Binding CompanyFilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" PlaceholderText="输入公司 / 拼音" SelectionChanged="GroupChatCompany_SelectionChanged" Width="140" Height="28">
+														<ComboBox.SelectionBoxItemTemplate>
+															<DataTemplate x:DataType="vm:LookupOptionViewModel">
+																<TextBlock Text="{Binding DisplayName}" />
+															</DataTemplate>
+														</ComboBox.SelectionBoxItemTemplate>
 														<ComboBox.ItemTemplate>
 															<DataTemplate x:DataType="vm:LookupOptionViewModel">
 																<TextBlock Text="{Binding DisplayName}" />
 															</DataTemplate>
 														</ComboBox.ItemTemplate>
 													</ComboBox>
-												<Button Grid.Column="4" Content="保存" Click="SaveGroupChat_Click" MinWidth="48" Height="28" />
+														<Button Grid.Column="4" Width="32" Height="28" Padding="0" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Background="Transparent" BorderBrush="Transparent" BorderThickness="0" Click="SaveGroupChat_Click" ToolTip.Tip="保存公司归属" AutomationProperties.Name="保存公司归属">
+															<PathIcon Width="16" Height="16" Data="M5,3H17L21,7V21H3V3H5M5,5V10H17V5H5M7,12V19H17V12H7M7,5V8H15V5H7Z" />
+														</Button>
 											</Grid>
 										</Border>
 									</DataTemplate>
@@ -251,7 +270,7 @@
 							<StackPanel Spacing="10">
 								<TextBlock FontSize="16" FontWeight="SemiBold" Text="文件导入" />
 								<TextBlock FontSize="12" Foreground="#6B7280" Text="支持 JSON / Excel，先预检再提交。" TextWrapping="Wrap" />
-								<TextBox Height="32" Watermark="导入 JSON / Excel 文件路径" Text="{Binding ImportFilePath}" />
+								<TextBox Height="28" Watermark="导入 JSON / Excel 文件路径" Text="{Binding ImportFilePath}" />
 								<WrapPanel ItemHeight="30" ItemWidth="92" Orientation="Horizontal">
 									<Button Content="选择文件" Click="PickImportFile_Click" MinWidth="84" Height="30" Margin="0,0,8,8" />
 									<Button Content="执行预检" Command="{Binding PreviewImportCommand}" IsEnabled="{Binding !IsBusy}" MinWidth="84" Height="30" Margin="0,0,8,8" />
@@ -266,19 +285,19 @@
 											<Border Padding="8" Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="1" CornerRadius="8">
 												<StackPanel Spacing="2">
 													<TextBlock FontSize="12" Foreground="#991B1B" Text="错误" />
-													<TextBlock FontSize="17" FontWeight="Bold" Text="{Binding ImportErrorCount}" />
+													<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding ImportErrorCount}" />
 												</StackPanel>
 											</Border>
 											<Border Grid.Column="1" Padding="8" Background="#FFFBEB" BorderBrush="#FCD34D" BorderThickness="1" CornerRadius="8">
 												<StackPanel Spacing="2">
 													<TextBlock FontSize="12" Foreground="#92400E" Text="警告" />
-													<TextBlock FontSize="17" FontWeight="Bold" Text="{Binding ImportWarningCount}" />
+													<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding ImportWarningCount}" />
 												</StackPanel>
 											</Border>
 											<Border Grid.Column="2" Padding="8" Background="#EFF6FF" BorderBrush="#93C5FD" BorderThickness="1" CornerRadius="8">
 												<StackPanel Spacing="2">
 													<TextBlock FontSize="12" Foreground="#1D4ED8" Text="提示" />
-													<TextBlock FontSize="17" FontWeight="Bold" Text="{Binding ImportInfoCount}" />
+													<TextBlock FontSize="16" FontWeight="Bold" Text="{Binding ImportInfoCount}" />
 												</StackPanel>
 											</Border>
 										</Grid>
@@ -317,7 +336,7 @@
 							<StackPanel Spacing="10">
 								<TextBlock FontSize="16" FontWeight="SemiBold" Text="文件导出" />
 								<TextBlock FontSize="12" Foreground="#6B7280" Text="导出当前快照，或生成示例模板。" TextWrapping="Wrap" />
-								<TextBox Height="32" Watermark="导出 JSON / Excel 文件路径" Text="{Binding ExportFilePath}" />
+								<TextBox Height="28" Watermark="导出 JSON / Excel 文件路径" Text="{Binding ExportFilePath}" />
 								<WrapPanel ItemHeight="30" ItemWidth="92" Orientation="Horizontal">
 									<Button Content="选择路径" Click="PickExportFile_Click" MinWidth="84" Height="30" Margin="0,0,8,8" />
 									<Button Content="导出文件" Command="{Binding ExportJsonCommand}" IsEnabled="{Binding !IsBusy}" MinWidth="84" Height="30" Margin="0,0,8,8" />
@@ -364,7 +383,7 @@
 															<TextBlock FontSize="11" Foreground="#92400E" Text="{Binding EntityIdentifier}" />
 															<StackPanel Orientation="Horizontal" Spacing="8">
 																<TextBlock FontSize="11" VerticalAlignment="Center" Foreground="#92400E" Text="提交时操作：" />
-																<ComboBox ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SelectedAction}" Width="148" Height="30" />
+																<ComboBox ItemsSource="{Binding AvailableActions}" SelectedItem="{Binding SelectedAction}" Width="148" Height="28" />
 															</StackPanel>
 														</StackPanel>
 													</Border>

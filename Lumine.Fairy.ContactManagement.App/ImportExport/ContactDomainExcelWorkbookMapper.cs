@@ -231,6 +231,7 @@ internal static class ContactDomainExcelWorkbookMapper
                 AccountId = GetString(row, headers, "AccountId"),
                 AccountDisplayName = GetString(row, headers, "AccountDisplayName"),
                 WeChatUsername = username,
+                IsGroupChat = GetBoolean(row, headers, "IsGroupChat", true),
                 DisplayName = GetString(row, headers, "DisplayName", fallback: username),
                 LastMessageAt = DateTimeOffset.TryParse(GetString(row, headers, "LastMessageAt"), out var lastMessageAt) ? lastMessageAt : null,
                 CompanyId = GetNullableString(row, headers, "CompanyId"),
@@ -414,7 +415,7 @@ internal static class ContactDomainExcelWorkbookMapper
     private static void WriteWeChatGroupChats(XLWorkbook workbook, IReadOnlyList<WeChatGroupChatProfile> items)
     {
         var worksheet = workbook.Worksheets.Add(WeChatGroupChatsSheetName);
-        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
+        var headers = new[] { "Id", "AccountId", "AccountDisplayName", "WeChatUsername", "IsGroupChat", "DisplayName", "LastMessageAt", "CompanyId", "ProjectId", "IsActive", "LastSyncedAt" };
         WriteHeaders(worksheet, headers);
         var row = 2;
         foreach (var item in items)
@@ -423,12 +424,13 @@ internal static class ContactDomainExcelWorkbookMapper
             worksheet.Cell(row, 2).Value = item.AccountId;
             worksheet.Cell(row, 3).Value = item.AccountDisplayName;
             worksheet.Cell(row, 4).Value = item.WeChatUsername;
-            worksheet.Cell(row, 5).Value = item.DisplayName;
-            worksheet.Cell(row, 6).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
-            worksheet.Cell(row, 7).Value = item.CompanyId ?? string.Empty;
-            worksheet.Cell(row, 8).Value = item.ProjectId ?? string.Empty;
-            worksheet.Cell(row, 9).Value = item.IsActive;
-            worksheet.Cell(row, 10).Value = item.LastSyncedAt.ToString("O");
+            worksheet.Cell(row, 5).Value = item.IsGroupChat;
+            worksheet.Cell(row, 6).Value = item.DisplayName;
+            worksheet.Cell(row, 7).Value = item.LastMessageAt?.ToString("O") ?? string.Empty;
+            worksheet.Cell(row, 8).Value = item.CompanyId ?? string.Empty;
+            worksheet.Cell(row, 9).Value = item.ProjectId ?? string.Empty;
+            worksheet.Cell(row, 10).Value = item.IsActive;
+            worksheet.Cell(row, 11).Value = item.LastSyncedAt.ToString("O");
             row++;
         }
         worksheet.Columns().AdjustToContents();
