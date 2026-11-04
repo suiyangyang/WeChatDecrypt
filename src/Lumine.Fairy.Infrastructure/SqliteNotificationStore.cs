@@ -47,7 +47,8 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
                 actions_json TEXT NOT NULL,
                 question_json TEXT NULL,
                 payload_json TEXT NULL,
-                related_task_id TEXT NULL
+                related_task_id TEXT NULL,
+                resolved_label TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_notifications_created_at ON notifications(created_at DESC);
             CREATE INDEX IF NOT EXISTS ix_notifications_source ON notifications(source);
@@ -55,10 +56,16 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
             """;
         command.ExecuteNonQuery();
 
+        EnsureOptionalColumn(connection, "payload_json TEXT NULL");
+        EnsureOptionalColumn(connection, "resolved_label TEXT NULL");
+    }
+
+    private static void EnsureOptionalColumn(SqliteConnection connection, string columnDefinition)
+    {
         try
         {
             using var migration = connection.CreateCommand();
-            migration.CommandText = "ALTER TABLE notifications ADD COLUMN payload_json TEXT NULL;";
+            migration.CommandText = $"ALTER TABLE notifications ADD COLUMN {columnDefinition};";
             migration.ExecuteNonQuery();
         }
         catch (SqliteException)
@@ -145,9 +152,17 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
     }
 
     public async Task<IReadOnlyList<NotificationRecord>> ListAsync(string? keyword = null, bool unreadOnly = false, CancellationToken cancellationToken = default)
-        => await ListPageAsync(keyword, unreadOnly, false, 0, 200, cancellationToken);
+        => await ListPageAsync(keyword, unreadOnly, false, null, null, 200, cancellationToken: cancellationToken);
 
-    public async Task<IReadOnlyList<NotificationRecord>> ListPageAsync(string? keyword, bool unreadOnly, bool readOnly, int offset, int limit, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NotificationRecord>> ListPageAsync(
+        string? keyword,
+        bool unreadOnly,
+        bool readOnly,
+        DateTimeOffset? beforeCreatedAt,
+        string? beforeId,
+        int limit,
+        bool workPageOnly = false,
+        CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -162,14 +177,20 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
                        OR deduplication_key LIKE $pattern)
                   AND ($unread = 0 OR is_read = 0)
                   AND ($read = 0 OR is_read = 1)
-                ORDER BY created_at DESC LIMIT $limit OFFSET $offset;
+                  AND ($work = 0 OR (category = 'work' COLLATE NOCASE
+                       AND is_resolved = 0 AND (is_read = 0 OR actions_json <> '[]')))
+                  AND ($before_created = '' OR created_at < $before_created
+                       OR (created_at = $before_created AND id < $before_id))
+                ORDER BY created_at DESC, id DESC LIMIT $limit;
                 """;
             command.Parameters.AddWithValue("$keyword", keyword?.Trim() ?? string.Empty);
             command.Parameters.AddWithValue("$pattern", $"%{keyword?.Trim() ?? string.Empty}%");
             command.Parameters.AddWithValue("$unread", unreadOnly ? 1 : 0);
             command.Parameters.AddWithValue("$read", readOnly ? 1 : 0);
+            command.Parameters.AddWithValue("$work", workPageOnly ? 1 : 0);
+            command.Parameters.AddWithValue("$before_created", beforeCreatedAt?.ToUniversalTime().ToString("O") ?? string.Empty);
+            command.Parameters.AddWithValue("$before_id", beforeId?.Trim() ?? string.Empty);
             command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
-            command.Parameters.AddWithValue("$offset", Math.Max(offset, 0));
             var result = new List<NotificationRecord>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken)) result.Add(Read(reader));
@@ -236,12 +257,30 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
         finally { _gate.Release(); }
     }
 
-    public Task<bool> ResolveAsync(string id, CancellationToken cancellationToken = default)
-        => UpdateFlagAsync(id, "is_resolved", cancellationToken);
+    public async Task<bool> ResolveAsync(string id, string? resolvedLabel = null, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE notifications
+                SET is_resolved = 1,
+                    resolved_label = COALESCE($label, resolved_label)
+                WHERE id = $id;
+                """;
+            command.Parameters.AddWithValue("$label", (object?)resolvedLabel ?? DBNull.Value);
+            command.Parameters.AddWithValue("$id", id);
+            return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        }
+        finally { _gate.Release(); }
+    }
 
     private async Task<bool> UpdateFlagAsync(string id, string column, CancellationToken cancellationToken)
     {
-        if (column is not ("is_read" or "is_resolved")) throw new ArgumentOutOfRangeException(nameof(column));
+        if (column is not "is_read") throw new ArgumentOutOfRangeException(nameof(column));
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -283,7 +322,8 @@ public sealed class SqliteNotificationStore : INotificationStore, IDisposable
             actions,
             question,
             payload,
-            reader.IsDBNull(reader.GetOrdinal("related_task_id")) ? null : reader.GetString(reader.GetOrdinal("related_task_id")));
+            reader.IsDBNull(reader.GetOrdinal("related_task_id")) ? null : reader.GetString(reader.GetOrdinal("related_task_id")),
+            reader.IsDBNull(reader.GetOrdinal("resolved_label")) ? null : reader.GetString(reader.GetOrdinal("resolved_label")));
     }
 
     public void Dispose() => _gate.Dispose();

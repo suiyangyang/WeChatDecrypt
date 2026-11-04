@@ -28,7 +28,7 @@ Fairy Windows 客户端
 
 ```json
 {
-  "host": "192.168.1.20",
+  "host": "127.0.0.1",
   "port": 18766,
   "token": "replace-with-shared-token",
   "timeoutSeconds": 10
@@ -47,7 +47,7 @@ Token 只写入本机配置，不要写入源码、日志、文档或提交记�
 3. 构建或发布后，配置文件会自动复制到 Fairy 可执行文件旁边。
 4. 完全退出并重新启动 Fairy。
 
-Fairy 默认不启动上下文接口，只有本地配置包含非空 Token 时才启动。只在同一台计算机使用时，`host` 可以填写 `127.0.0.1`；QwenPaw 在 NAS 上运行时，必须填写 Fairy Windows 计算机的局域网 IP。
+Fairy 默认不启动上下文接口，只有本地配置包含非空 Token 时才启动。QwenPaw 与 Fairy 同机时使用 `127.0.0.1`；QwenPaw 在 Docker、NAS 或其它计算机上运行时，必须填写 Fairy Windows 计算机的实际可达地址。
 
 ### QwenPaw MCP 适配器
 
@@ -64,7 +64,7 @@ tools/lumine-fairy-wechat-context-mcp/wechat-context.local.json
 python3 /app/working/tools/lumine-fairy-wechat-context-mcp/server.py
 ```
 
-在 QwenPaw 的 MCP 管理界面或实际部署配置中注册 stdio MCP：
+在 QwenPaw 的 **Agent > MCP** 管理界面或实际部署配置中注册 stdio MCP；同机运行时使用 `127.0.0.1:18766`：
 
 ```json
 {
@@ -79,6 +79,23 @@ python3 /app/working/tools/lumine-fairy-wechat-context-mcp/server.py
 }
 ```
 
+### 微信分析 Skill
+
+将 `docs/user/qwenpaw/skills/wechat-analysis-context/SKILL.md` 安装到 QwenPaw 的自定义 Skill 目录：
+
+```text
+%USERPROFILE%\\.qwenpaw\\customized_skills\\wechat-analysis-context\\SKILL.md
+```
+
+然后在 **Agent > Skills** 中启用或重新加载。Skill 只负责在微信分析前调用 `resolve_wechat_context` 获取最小业务上下文，所有联系人归属修改仍由 Fairy 本地客户端完成。
+
+### MCP 驱动审批策略
+
+`WeChatAnalysist` 每轮分析都会调用 `resolve_wechat_context`。该驱动的 `policy.default_effect` 必须是 `allow`；若为 `ask`，每次调用都会被 QwenPaw 审批等待拦住（默认 5 分钟超时，等待期间不产生流式事件），Fairy 客户端会先以“QwenPaw 流式响应连续 120 秒没有新数据”报失败。
+
+- 驱动卡路径：`workspaces/WeChatAnalysist/drivers/mcp/lumine_fairy_wechat_context.yaml`（容器内为 `/app/working/workspaces/...`）
+- 重新注册 MCP 或升级 QwenPaw 后，如果该策略被重置为 `ask`，需要恢复为 `allow`，并跑一轮分析确认无新的 `Generic approval pending created` 日志
+
 ## QwenPaw 自执行部署包
 
 交付给具备本地文件和 MCP 管理权限的 QwenPaw 部署 Agent 时，可以提供 `lumine-fairy-wechat-analysis-skill-mcp.zip`。压缩包包含 Skill、stdio bridge、无密钥配置模板、MCP 注册模板和 `SEND_TO_QWENPAW.md` 安装任务。部署 Agent 负责将文件放入 QwenPaw 的持久化目录、注册 MCP 并执行协议验证。
@@ -90,10 +107,10 @@ python3 /app/working/tools/lumine-fairy-wechat-context-mcp/server.py
 Fairy 绑定非回环地址时，Windows 可能需要 URL ACL。请在管理员 PowerShell 中执行以下命令，并替换为实际地址：
 
 ```powershell
-netsh http add urlacl url=http://192.168.1.20:18766/ user="$env:USERDOMAIN\$env:USERNAME"
+netsh http add urlacl url=http://<Fairy-IP>:18766/ user="$env:USERDOMAIN\$env:USERNAME"
 ```
 
-当 QwenPaw 在 NAS `192.168.1.100` 上运行时，可只允许 NAS 访问该端口：
+当 QwenPaw 在其它设备上运行时，可只允许该设备的实际 IP 访问该端口：
 
 ```powershell
 New-NetFirewallRule `
@@ -103,7 +120,7 @@ New-NetFirewallRule `
   -LocalPort 18766 `
   -Action Allow `
   -Profile Private `
-  -RemoteAddress 192.168.1.100
+  -RemoteAddress <QwenPaw-IP>
 ```
 
 不要将 `18766` 做公网端口转发。
@@ -114,7 +131,7 @@ New-NetFirewallRule `
 
 ```powershell
 Invoke-RestMethod `
-  -Uri 'http://192.168.1.20:18766/health' `
+  -Uri 'http://127.0.0.1:18766/health' `
   -Headers @{ Authorization = 'Bearer <Token>' }
 ```
 

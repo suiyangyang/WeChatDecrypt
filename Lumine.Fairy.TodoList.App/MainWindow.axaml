@@ -421,7 +421,7 @@
                             <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:TodoEntryItemViewModel">
-                                  <Border Margin="0,0,0,7" Padding="9" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1" DragDrop.AllowDrop="True" PointerPressed="TodoCardPointerPressed" PointerMoved="TodoCardPointerMoved" PointerReleased="TodoCardPointerReleased" DragDrop.DragOver="TodoCardDragOver" DragDrop.Drop="TodoCardDrop" ToolTip.Tip="拖动调整顺序，点击标题编辑详情">
+                                  <Border Margin="0,0,0,7" Padding="9" CornerRadius="8" Background="#FFFFFF" BorderBrush="#E5E7EB" BorderThickness="1" DragDrop.AllowDrop="True" PointerPressed="TodoCardPointerPressed" PointerMoved="TodoCardPointerMoved" PointerReleased="TodoCardPointerReleased" DragDrop.DragOver="TodoCardDragOver" DragDrop.Drop="TodoCardDrop">
                                     <StackPanel Spacing="6">
                                       <Button Content="{Binding DisplayTitle}" Command="{Binding #RootWindow.DataContext.OpenTodoDetailCommand}" CommandParameter="{Binding .}" HorizontalContentAlignment="Left" Padding="0" Background="Transparent" BorderBrush="Transparent" FontWeight="SemiBold" />
                                       <TextBlock FontSize="11" Foreground="#64748B" Text="{Binding ProjectName}" TextTrimming="CharacterEllipsis" />

@@ -57,6 +57,8 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
                 labels_json TEXT NOT NULL DEFAULT '[]',
                 checklist_json TEXT NOT NULL DEFAULT '[]',
                 comments_json TEXT NOT NULL DEFAULT '[]',
+                file_references_json TEXT NOT NULL DEFAULT '[]',
+                archived_at TEXT NULL,
                 updated_at TEXT NULL
             );
             CREATE TABLE IF NOT EXISTS todo_boards (
@@ -87,11 +89,25 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
         EnsureColumn(connection, "todos", "labels_json", "TEXT NOT NULL DEFAULT '[]'");
         EnsureColumn(connection, "todos", "checklist_json", "TEXT NOT NULL DEFAULT '[]'");
         EnsureColumn(connection, "todos", "comments_json", "TEXT NOT NULL DEFAULT '[]'");
+        EnsureColumn(connection, "todos", "file_references_json", "TEXT NOT NULL DEFAULT '[]'");
         EnsureColumn(connection, "todos", "updated_at", "TEXT NULL");
+        EnsureColumn(connection, "todos", "archived_at", "TEXT NULL");
 
         using var layoutIndex = connection.CreateCommand();
         layoutIndex.CommandText = "CREATE INDEX IF NOT EXISTS ix_todos_board_list_position ON todos(board_id, list_id, position)";
         layoutIndex.ExecuteNonQuery();
+
+        using var archivedAtBackfill = connection.CreateCommand();
+        archivedAtBackfill.CommandText = """
+            UPDATE todos
+            SET archived_at = COALESCE(updated_at, completed_at, created_at)
+            WHERE is_archived = 1 AND archived_at IS NULL;
+            """;
+        archivedAtBackfill.ExecuteNonQuery();
+
+        using var archivedIndex = connection.CreateCommand();
+        archivedIndex.CommandText = "CREATE INDEX IF NOT EXISTS ix_todos_is_archived ON todos(is_archived)";
+        archivedIndex.ExecuteNonQuery();
 
         using var seed = connection.CreateCommand();
         seed.CommandText = """
@@ -169,13 +185,14 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
                 (id,title,summary,priority,due_at,assignee,confidence,source_refs_json,status,
                  created_at,confirmed_at,completed_at,source,conversation_id,company_id,company_name,
                  conversation_display_name,is_group_conversation,board_id,list_id,position,is_archived,
-                 labels_json,checklist_json,comments_json,updated_at)
+                 labels_json,checklist_json,comments_json,file_references_json,archived_at,updated_at)
                 VALUES ($id,$title,$summary,$priority,$due,$assignee,$confidence,$refs,$status,
                         $created,$confirmed,$completed,$source,$conversation,$companyId,$companyName,
                         $conversationDisplayName,$isGroupConversation,$boardId,$listId,$position,$isArchived,
-                        $labels,$checklist,$comments,$updated);
+                        $labels,$checklist,$comments,$fileReferences,$archivedAt,$updated);
                 """;
             AddParameters(insert, storedCandidate);
+            insert.Parameters.AddWithValue("$archivedAt", GetArchivedAtToStore(storedCandidate));
             await insert.ExecuteNonQueryAsync(cancellationToken);
             return storedCandidate;
         }
@@ -271,14 +288,16 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
                      company_id = $companyId,
                      company_name = $companyName,
                      status = $status,
-                    board_id = $boardId,
-                    list_id = $listId,
-                    position = $position,
-                    is_archived = $isArchived,
-                    labels_json = $labels,
-                    checklist_json = $checklist,
-                    comments_json = $comments,
-                    updated_at = $updated
+                     board_id = $boardId,
+                     list_id = $listId,
+                     position = $position,
+                     is_archived = $isArchived,
+                     archived_at = CASE WHEN $isArchived = 1 THEN COALESCE(archived_at, $archivedAt) ELSE NULL END,
+                     labels_json = $labels,
+                     checklist_json = $checklist,
+                     comments_json = $comments,
+                     file_references_json = $fileReferences,
+                     updated_at = $updated
                 WHERE id = $id;
                 """;
             update.Parameters.AddWithValue("$id", todo.Id);
@@ -294,9 +313,11 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
             update.Parameters.AddWithValue("$listId", todo.ListId);
             update.Parameters.AddWithValue("$position", todo.Position);
             update.Parameters.AddWithValue("$isArchived", todo.IsArchived ? 1 : 0);
+            update.Parameters.AddWithValue("$archivedAt", GetArchivedAtToStore(todo));
             update.Parameters.AddWithValue("$labels", JsonSerializer.Serialize(todo.Labels ?? Array.Empty<TodoLabel>(), _json));
             update.Parameters.AddWithValue("$checklist", JsonSerializer.Serialize(todo.Checklist ?? Array.Empty<TodoChecklistItem>(), _json));
             update.Parameters.AddWithValue("$comments", JsonSerializer.Serialize(todo.Comments ?? Array.Empty<TodoComment>(), _json));
+            update.Parameters.AddWithValue("$fileReferences", JsonSerializer.Serialize(todo.FileReferences ?? Array.Empty<TodoFileReference>(), _json));
             update.Parameters.AddWithValue("$updated", (todo.UpdatedAt ?? DateTimeOffset.UtcNow).ToString("O"));
             if (await update.ExecuteNonQueryAsync(cancellationToken) == 0) return null;
 
@@ -421,6 +442,50 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
             command.CommandText = "DELETE FROM todos WHERE id = $id";
             command.Parameters.AddWithValue("$id", id);
             return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<int> DeleteArchivedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var ids = new List<string>();
+            using (var select = connection.CreateCommand())
+            {
+                select.CommandText = "SELECT * FROM todos WHERE is_archived = 1";
+                await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    var todo = Read(reader);
+                    if (ArchivedTodoCleanupPolicy.IsCleanupCandidate(todo, cutoff)) ids.Add(todo.Id);
+                }
+            }
+
+            if (ids.Count == 0) return 0;
+
+            using var transaction = connection.BeginTransaction();
+            using var delete = connection.CreateCommand();
+            delete.Transaction = transaction;
+            delete.CommandText = "DELETE FROM todos WHERE id = $id";
+            var idParameter = delete.CreateParameter();
+            idParameter.ParameterName = "$id";
+            delete.Parameters.Add(idParameter);
+            var deleted = 0;
+            foreach (var id in ids)
+            {
+                idParameter.Value = id;
+                deleted += await delete.ExecuteNonQueryAsync(cancellationToken);
+            }
+            transaction.Commit();
+            return deleted;
         }
         finally
         {
@@ -685,6 +750,11 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
         }
     }
 
+    private static object GetArchivedAtToStore(TodoRecord todo)
+        => !todo.IsArchived
+            ? DBNull.Value
+            : (todo.ArchivedAt ?? DateTimeOffset.UtcNow).ToString("O");
+
     private void AddParameters(SqliteCommand command, TodoRecord todo)
     {
         command.Parameters.AddWithValue("$id", todo.Id);
@@ -712,6 +782,7 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
         command.Parameters.AddWithValue("$labels", JsonSerializer.Serialize(todo.Labels ?? Array.Empty<TodoLabel>(), _json));
         command.Parameters.AddWithValue("$checklist", JsonSerializer.Serialize(todo.Checklist ?? Array.Empty<TodoChecklistItem>(), _json));
         command.Parameters.AddWithValue("$comments", JsonSerializer.Serialize(todo.Comments ?? Array.Empty<TodoComment>(), _json));
+        command.Parameters.AddWithValue("$fileReferences", JsonSerializer.Serialize(todo.FileReferences ?? Array.Empty<TodoFileReference>(), _json));
         command.Parameters.AddWithValue("$updated", todo.UpdatedAt?.ToString("O") ?? (object)DBNull.Value);
     }
 
@@ -726,6 +797,7 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
         var labels = ReadJson<IReadOnlyList<TodoLabel>>(reader, "labels_json") ?? Array.Empty<TodoLabel>();
         var checklist = ReadJson<IReadOnlyList<TodoChecklistItem>>(reader, "checklist_json") ?? Array.Empty<TodoChecklistItem>();
         var comments = ReadJson<IReadOnlyList<TodoComment>>(reader, "comments_json") ?? Array.Empty<TodoComment>();
+        var fileReferences = ReadJson<IReadOnlyList<TodoFileReference>>(reader, "file_references_json") ?? Array.Empty<TodoFileReference>();
         return new TodoRecord(
             reader.GetString(reader.GetOrdinal("id")),
             reader.GetString(reader.GetOrdinal("title")),
@@ -752,7 +824,9 @@ public sealed class SqliteTodoStore : ITodoStore, IDisposable
             labels,
             checklist,
             comments,
-            ReadDateTimeOffset(reader, "updated_at"));
+            ReadDateTimeOffset(reader, "updated_at"),
+            fileReferences,
+            ReadDateTimeOffset(reader, "archived_at"));
     }
 
     private T? ReadJson<T>(SqliteDataReader reader, string column)

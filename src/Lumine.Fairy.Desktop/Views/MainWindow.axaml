@@ -112,6 +112,21 @@
         <Style Selector="Border.todo-card:pointerover Button.todo-card-more">
             <Setter Property="Opacity" Value="1"/>
         </Style>
+        <!-- 待确认卡片悬浮删除按钮：默认透明，鼠标悬浮卡片时显示在卡片右下角，与“更多”按钮同一套悬浮显隐方式 -->
+        <Style Selector="Border.todo-card Button.todo-card-quick-delete">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="5,4"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.todo-card:pointerover Button.todo-card-quick-delete">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Border.todo-card:pointerover Button.todo-card-quick-delete:pointerover">
+            <Setter Property="Background" Value="#FDECEE"/>
+        </Style>
         <Style Selector="Border.todo-card-tag">
             <Setter Property="Background" Value="#000000"/>
             <Setter Property="CornerRadius" Value="8"/>
@@ -877,6 +892,10 @@
                                                                                     </MenuFlyout>
                                                                                 </Button.Flyout>
                                                                             </Button>
+                                                                        <!-- 右下角悬浮删除按钮：仅待确认列卡片显示，点击直接删除 -->
+                                                                        <Button Grid.Column="1" Classes="todo-card-quick-delete" Command="{Binding DeleteCommand}" IsVisible="{Binding CanQuickDelete}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,28,0,0" ToolTip.Tip="删除卡片">
+                                                                            <Path Classes="menu-icon danger" Data="M3.5 6h17M9 6V4.2A1.7 1.7 0 0 1 10.7 2.5h2.6A1.7 1.7 0 0 1 15 4.2V6M18.5 6l-.8 13.2a2 2 0 0 1-2 1.8H8.3a2 2 0 0 1-2-1.8L5.5 6M10 10.5v6.5M14 10.5v6.5"/>
+                                                                        </Button>
                                                                         </Grid>
                                                                      </Border>
                                                                     </DataTemplate>

@@ -46,7 +46,7 @@ Content-Type: application/json
 [Environment]::SetEnvironmentVariable('LumineFairyNotificationBindAddress', '+', 'User')
 
 # 更安全的选择：只绑定 Fairy 所在计算机的指定局域网地址
-[Environment]::SetEnvironmentVariable('LumineFairyNotificationBindAddress', '192.168.1.20', 'User')
+[Environment]::SetEnvironmentVariable('LumineFairyNotificationBindAddress', '127.0.0.1', 'User')
 ```
 
 修改环境变量后必须重启 Fairy。允许的值包括 `+`、`*`、`0.0.0.0`（所有 IPv4 网卡），或一个具体的 IPv4 地址/主机名。默认全网卡监听时，设置页会显示检测到的第一个非回环 IPv4 地址；多网卡环境应优先配置具体地址。
@@ -63,7 +63,7 @@ netsh http add urlacl url=http://+:18765/ user="$env:USERDOMAIN\$env:USERNAME"
 netsh http show urlacl
 ```
 
-还需要在 Fairy 所在 Windows 计算机的防火墙中放行 TCP `18765`。建议只允许实际第三方程序所在的固定 IP，例如 QwenPaw/NAS 地址为 `192.168.1.100` 时：
+同机调用使用 `127.0.0.1` 时无需额外配置 URL ACL 或防火墙。跨设备调用时，才需要在 Fairy 所在 Windows 计算机的防火墙中放行 TCP `18765`，并只允许 QwenPaw 所在设备的实际固定 IP：
 
 ```powershell
 New-NetFirewallRule `
@@ -73,7 +73,7 @@ New-NetFirewallRule `
   -LocalPort 18765 `
   -Action Allow `
   -Profile Private `
-  -RemoteAddress 192.168.1.100
+  -RemoteAddress <QwenPaw-IP>
 ```
 
 不要配置公网端口转发；外部访问应限定在受信任的局域网和防火墙来源地址内。
@@ -226,7 +226,7 @@ Authorization: Bearer <notification-token>
 
 ## 7. 执行通知动作
 
-动作必须先出现在通知的 `actions` 数组中，且通知尚未解决。
+动作必须先出现在通知的 `actions` 数组中。对已解决的通知重复执行动作不会再次生效，而是返回 `alreadyHandled = true`。
 
 ### 请求
 
@@ -247,19 +247,21 @@ POST http://<Fairy-IP>:18765/api/v1/notifications/7f7b4e4f6ce44f68a6c8a4dd88dd4f
 ```json
 {
   "status": "completed",
-  "notificationId": "7f7b4e4f6ce44f68a6c8a4dd4f1",
-  "message": "通知已处理。"
+  "notificationId": "7f7b4e4f6ce44f68a6c8a4dd88dd4f1",
+  "message": "通知已处理。",
+  "alreadyHandled": false
 }
 ```
 
 处理规则：
 
-- `confirm-todo`：从 `payload.todoId` 读取 TODO 候选并确认，成功后解决原通知。
-- `reject-todo`：从 `payload.todoId` 读取 TODO 候选并拒绝，成功后解决原通知。
+- `confirm-todo`：从 `payload.todoId` 读取 TODO 候选并确认，成功后解决原通知并写入处理标注“已加入TODO”。
+- `reject-todo`：从 `payload.todoId` 读取 TODO 候选并拒绝，成功后解决原通知并写入处理标注“已处理”。
+- 两种动作都不再追加“处理完成”通知，桌面端只在主窗口顶部 Toast 反馈结果。
 - `question-solution`：等价于提交 `solutionId = actionId` 的问题响应。
 - 其他 `kind`：直接解决通知并返回“通知已处理”。
 
-动作成功后，桌面端会刷新通知中心。对已解决通知重复执行动作、执行不存在的动作，或 TODO 标识缺失时，当前服务会返回 `500`，调用方不得依赖错误消息文本判断业务状态。
+动作成功后，桌面端会刷新通知中心。`alreadyHandled = true` 表示该消息此前已经处理：通知已解决，或 `payload.todoId` 对应的候选已在工作列表被确认、忽略或删除。这类请求同样返回 `200`，服务端会把通知标记为已解决，不会重复生成 TODO，也不会再产生后续通知。执行不存在的动作或 TODO 标识缺失时，当前服务仍返回 `500`，调用方不得依赖错误消息文本判断业务状态。
 
 ## 8. 提交问题通知响应
 

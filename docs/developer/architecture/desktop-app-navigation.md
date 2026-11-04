@@ -1,8 +1,10 @@
 # 桌面 App 导航
 
-`Lumine.Fairy.Desktop` 的左侧导航包含通知中心、工作、微信分析、App、远程设备和设置。
+`Lumine.Fairy.Desktop` 的主页面左侧导航包含通知中心、工作、微信分析、联系人管理、App、远程设备和设置，不提供“关于”入口。
 
-导航行的图标与文字之间保持 8 px 间距。设置和关于入口使用 `Assets/icons/nav-settings.svg` 与 `Assets/icons/nav-about.svg` 定义的 SVG 几何，并由 Avalonia `Path` 在运行时绘制。
+进入设置后，设置壳层覆盖主页面：左侧替换为“返回主页面”和“常规”“工作设置”“微信分析”“通知”四个分类，右侧只呈现当前分类。返回操作恢复进入设置前的主页面；微信分析执行页的“分析设置”直接进入“微信分析”分类。
+
+导航行的图标与文字之间保持 8 px 间距。主页面设置入口使用 `Assets/icons/nav-settings.svg` 定义的 SVG 几何，并由 Avalonia `Path` 在运行时绘制。
 
 ## App 页面
 

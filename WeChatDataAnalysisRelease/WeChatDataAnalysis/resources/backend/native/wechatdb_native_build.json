@@ -1,12 +1,15 @@
 {
   "schemaVersion": 2,
   "distributionMode": "public",
-  "buildId": "wcdb-prod-20260817-native-asr-dll-auth-1",
-  "buildIssuedAtUnix": 1786950083,
-  "buildExpiresAtUnix": 1790838083,
+  "buildId": "wcda-36122918297-1-windows-native",
+  "buildIssuedAtUnix": 1790331319,
+  "buildExpiresAtUnix": 1794219319,
   "developmentBuild": false,
   "offlineBootstrapFeatureBits": 3,
   "offlineExportSealFormat": "WES2",
+  "databaseWriteBuild": false,
+  "readOnlyBuild": true,
+  "wechatActions": [],
   "nativeAsrAbiVersion": 1,
   "nativeAsrFeatureBit": 16,
   "nativeAsrAuthorization": "database-read",
@@ -27,5 +30,7 @@
   "securityNoticeSha256": "acccc4786215247a3890588982a0cc17bceaa79477a059d0f9b7608467bc7ea5",
   "securityCheckpointSetId": "WCE-AI-CHECKPOINT-SET-V3",
   "securityCheckpointCount": 7,
-  "securityCheckpointSetSha256": "da019156ecbd00b9f9ce3b2ac4dd54e1609ad5dfc3ad5b4e3f756d389300d901"
+  "securityCheckpointSetSha256": "da019156ecbd00b9f9ce3b2ac4dd54e1609ad5dfc3ad5b4e3f756d389300d901",
+  "sourceRuntime": true,
+  "windowsHostVerification": "same-user-direct-parent"
 }

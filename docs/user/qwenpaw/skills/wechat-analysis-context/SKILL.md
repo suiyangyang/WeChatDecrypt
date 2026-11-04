@@ -67,12 +67,14 @@ stdio MCP 适配器从与 `server.py` 同一目录的 `wechat-context.local.json
 
 ```json
 {
-  "host": "192.168.1.20",
+  "host": "127.0.0.1",
   "port": 18766,
   "token": "与 Fairy 配置相同的 Token",
   "timeoutSeconds": 10
 }
 ```
+
+同机运行 QwenPaw 和 Fairy 时使用 `127.0.0.1:18766`；只有跨设备或容器部署时，才将 `host` 改为 Fairy 所在机器的实际可达地址，并按运维文档配置网络权限。
 
 `host`、`port` 和 `token` 必须与 Fairy 可执行文件旁的配置一致；`timeoutSeconds` 可保持为 `10`，有效范围为 1～60 秒。启动命令示例：
 

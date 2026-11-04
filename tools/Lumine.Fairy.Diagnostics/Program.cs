@@ -72,7 +72,7 @@ internal static class Program
             var username = ReadEnvironment("QwenPawUser");
             var password = ReadEnvironment("QwenPawPwd");
             var serverUrl = ReadEnvironment("QwenPawUrl");
-            if (string.IsNullOrWhiteSpace(serverUrl)) serverUrl = "http://192.168.1.100:18803";
+            if (string.IsNullOrWhiteSpace(serverUrl)) serverUrl = "http://127.0.0.1:8088";
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                 throw new InvalidOperationException("未配置 QwenPawUser 或 QwenPawPwd，无法执行 --analyze。");
 

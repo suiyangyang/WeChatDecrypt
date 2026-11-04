@@ -51,6 +51,8 @@ public sealed record NotificationResponse(
     string? SolutionId,
     string? CustomInput);
 
+public sealed record NotificationActionResult(string Message, bool AlreadyHandled = false);
+
 public sealed record NotificationRecord(
     string Id,
     string Title,
@@ -68,7 +70,8 @@ public sealed record NotificationRecord(
     IReadOnlyList<NotificationAction> Actions,
     QuestionPayload? Question,
     IReadOnlyDictionary<string, object?> Payload,
-    string? RelatedTaskId);
+    string? RelatedTaskId,
+    string? ResolvedLabel = null);
 
 public sealed record QwenPawLoginResult(string Token, string Username);
 
@@ -137,9 +140,24 @@ public sealed class WeChatAnalysisSettings
     ];
     public WeChatAutomaticAnalysisMode AutomaticMode { get; set; } = WeChatAutomaticAnalysisMode.OneMonth;
     public int AnalysisIntervalMinutes { get; set; } = DefaultAnalysisIntervalMinutes;
+    public bool NotifyAfterEveryAnalysis { get; set; } = true;
+    public bool NotifyWhenWorkContentFound { get; set; }
 
     public static int NormalizeAnalysisIntervalMinutes(int value)
         => Math.Clamp(value, MinimumAnalysisIntervalMinutes, MaximumAnalysisIntervalMinutes);
+}
+
+public sealed class WorkSettings
+{
+    public const int DefaultArchivedRetentionDays = 180;
+    public const int MinimumArchivedRetentionDays = 1;
+    public const int MaximumArchivedRetentionDays = 3650;
+
+    public bool EnableArchivedAutoCleanup { get; set; } = true;
+    public int ArchivedRetentionDays { get; set; } = DefaultArchivedRetentionDays;
+
+    public static int NormalizeArchivedRetentionDays(int value)
+        => Math.Clamp(value, MinimumArchivedRetentionDays, MaximumArchivedRetentionDays);
 }
 
 public sealed record WeChatWhitelistEntry(
@@ -169,7 +187,8 @@ public sealed record AnalysisProgressSnapshot(
     int TotalMessages = 0,
     int CurrentContactIndex = 0,
     int CompletedContacts = 0,
-    string Notice = "");
+    string Notice = "",
+    bool IsFinished = false);
 
 public sealed record WeChatAnalysisRequest(
     string AccountId,
@@ -199,6 +218,8 @@ public sealed record TodoLabel(string Id, string Name, string Color);
 public sealed record TodoChecklistItem(string Id, string Text, bool IsCompleted);
 
 public sealed record TodoComment(string Id, string Author, string Text, DateTimeOffset CreatedAt);
+
+public sealed record TodoFileReference(string Path, bool IsDirectory = false);
 
 public sealed record TodoBoardRecord(string Id, string Name, string Color);
 
@@ -236,7 +257,9 @@ public sealed record TodoRecord(
     IReadOnlyList<TodoLabel>? Labels = null,
     IReadOnlyList<TodoChecklistItem>? Checklist = null,
     IReadOnlyList<TodoComment>? Comments = null,
-    DateTimeOffset? UpdatedAt = null);
+    DateTimeOffset? UpdatedAt = null,
+    IReadOnlyList<TodoFileReference>? FileReferences = null,
+    DateTimeOffset? ArchivedAt = null);
 
 public sealed record IntentCandidate(
     string Id,

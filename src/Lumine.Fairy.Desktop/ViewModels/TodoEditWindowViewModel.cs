@@ -4,13 +4,18 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lumine.Fairy.ContactManagement.App.ViewModels;
+using Lumine.Fairy.Desktop.Services;
 using Lumine.Fairy.Protocol;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace Lumine.Fairy.Desktop.ViewModels;
 
 public sealed partial class TodoEditWindowViewModel : ObservableObject
 {
+    public const int MaxLabelCount = 10;
+    public const int MaxLabelNameLength = 30;
+
     private readonly TodoRecord _original;
     private readonly Func<TodoRecord, Task<TodoRecord?>> _saveAsync;
     private readonly Action<TodoRecord?> _closeAction;
@@ -49,10 +54,17 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
         IsArchived = todo.IsArchived;
         foreach (var label in todo.Labels ?? Array.Empty<TodoLabel>())
             Labels.Add(new TodoLabelEditorViewModel(label, RemoveLabel));
+        ColorOptions = TodoLabelColors.CommonColors
+            .Select(option => new TodoLabelColorOptionViewModel(option, false, selected => SelectLabelColor(selected.Color)))
+            .ToList();
+        SelectedLabel = Labels.FirstOrDefault();
         foreach (var item in todo.Checklist ?? Array.Empty<TodoChecklistItem>())
             ChecklistItems.Add(new TodoChecklistItemViewModel(item, RemoveChecklistItem));
         foreach (var comment in todo.Comments ?? Array.Empty<TodoComment>())
             Comments.Add(comment);
+        foreach (var reference in todo.FileReferences ?? Array.Empty<TodoFileReference>())
+            FileReferences.Add(new TodoFileReferenceViewModel(reference, RemoveFileReference));
+        ChecklistItems.CollectionChanged += (_, _) => CopyChecklistAsTextCommand.NotifyCanExecuteChanged();
     }
 
     [ObservableProperty] private string _title = string.Empty;
@@ -62,6 +74,7 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
     [ObservableProperty] private DateTimeOffset? _dueDate;
     [ObservableProperty] private TodoListOption? _selectedList;
     [ObservableProperty] private TodoCompanyOption? _selectedCompany;
+    [ObservableProperty] private TodoLabelEditorViewModel? _selectedLabel;
     [ObservableProperty] private string _companyFilterText = string.Empty;
     [ObservableProperty] private bool _isArchived;
     [ObservableProperty] private string _newLabelName = string.Empty;
@@ -83,13 +96,25 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
     public ObservableCollection<TodoLabelEditorViewModel> Labels { get; } = [];
     public ObservableCollection<TodoChecklistItemViewModel> ChecklistItems { get; } = [];
     public ObservableCollection<TodoComment> Comments { get; } = [];
+    public ObservableCollection<TodoFileReferenceViewModel> FileReferences { get; } = [];
     public ObservableCollection<TodoCompanyOption> FilteredCompanyOptions { get; } = [];
+    public IReadOnlyList<TodoLabelColorOptionViewModel> ColorOptions { get; }
     public bool HasLabels => Labels.Count > 0;
+    public bool CanAddLabel => Labels.Count < MaxLabelCount;
+    public string LabelLimitText => $"{Labels.Count}/{MaxLabelCount} 个标签，每个最多 {MaxLabelNameLength} 个字符";
     public bool HasChecklist => ChecklistItems.Count > 0;
+    public bool CanCopyChecklist => ChecklistItems.Count > 0;
     public bool HasComments => Comments.Count > 0;
+    public bool HasFileReferences => FileReferences.Count > 0;
 
     partial void OnStatusTextChanged(string value)
         => OnPropertyChanged(nameof(IsStatusError));
+
+    partial void OnSelectedLabelChanged(TodoLabelEditorViewModel? value)
+    {
+        foreach (var option in ColorOptions)
+            option.SetSelected(value is not null && string.Equals(option.Color, value.Color, StringComparison.OrdinalIgnoreCase));
+    }
 
     partial void OnSelectedCompanyChanged(TodoCompanyOption? value)
     {
@@ -128,6 +153,7 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
                 IsArchived = IsArchived,
                 Labels = Labels
                     .Where(label => !string.IsNullOrWhiteSpace(label.Name))
+                    .Take(MaxLabelCount)
                     .Select(label => new TodoLabel(label.Id, label.Name.Trim(), label.Color))
                     .ToList(),
                 Checklist = ChecklistItems
@@ -135,6 +161,9 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
                     .Select(item => new TodoChecklistItem(item.Id, item.Text.Trim(), item.IsCompleted))
                     .ToList(),
                 Comments = Comments.ToList(),
+                FileReferences = FileReferences
+                    .Select(reference => new TodoFileReference(reference.Path, reference.IsDirectory))
+                    .ToList(),
                 UpdatedAt = DateTimeOffset.UtcNow,
             };
             if (!string.IsNullOrWhiteSpace(NewCommentText))
@@ -173,19 +202,48 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
     [RelayCommand]
     private void AddLabel()
     {
-        if (string.IsNullOrWhiteSpace(NewLabelName)) return;
-        Labels.Add(new TodoLabelEditorViewModel(
+        var name = NewLabelName.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+        if (Labels.Count >= MaxLabelCount)
+        {
+            StatusText = $"标签最多添加 {MaxLabelCount} 个。";
+            return;
+        }
+
+        if (name.Length > MaxLabelNameLength)
+        {
+            StatusText = $"标签名称最多 {MaxLabelNameLength} 个字符。";
+            return;
+        }
+
+        var label = new TodoLabelEditorViewModel(
             new TodoLabel($"label:{Guid.NewGuid():N}", NewLabelName.Trim(), TodoLabelColors.DefaultColor),
-            RemoveLabel));
+            RemoveLabel);
+        Labels.Add(label);
+        SelectedLabel = label;
         NewLabelName = string.Empty;
         OnPropertyChanged(nameof(HasLabels));
+        OnPropertyChanged(nameof(CanAddLabel));
+        OnPropertyChanged(nameof(LabelLimitText));
     }
 
     private void RemoveLabel(TodoLabelEditorViewModel label)
     {
+        if (SelectedLabel == label)
+        {
+            var index = Labels.IndexOf(label);
+            SelectedLabel = Labels.ElementAtOrDefault(index + 1)
+                            ?? Labels.ElementAtOrDefault(index - 1);
+        }
+
         Labels.Remove(label);
         OnPropertyChanged(nameof(HasLabels));
+        OnPropertyChanged(nameof(CanAddLabel));
+        OnPropertyChanged(nameof(LabelLimitText));
     }
+
+    private void SelectLabelColor(string color)
+        => SelectedLabel?.SetColor(color);
 
     private void RequestRefreshFilteredCompanyOptions()
     {
@@ -263,6 +321,54 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(HasChecklist));
     }
 
+    // 将子任务清单以"子任务清单：\n1.xxx\n2.xxx"格式复制到剪贴板，
+    // 供聊天/工单等场景直接粘贴使用。空白行会被跳过。
+    [RelayCommand(CanExecute = nameof(CanCopyChecklist))]
+    private async Task CopyChecklistAsTextAsync()
+    {
+        var text = BuildChecklistAsText();
+        var ok = await AppClipboard.TrySetTextAsync(text);
+        StatusText = ok
+            ? $"已复制 {ChecklistItems.Count} 个子任务到剪贴板。"
+            : "复制失败：剪贴板不可用。";
+    }
+
+    private string BuildChecklistAsText()
+    {
+        var sb = new StringBuilder();
+        sb.Append("子任务清单：");
+        var index = 0;
+        foreach (var item in ChecklistItems)
+        {
+            var text = item.Text.Trim();
+            if (string.IsNullOrEmpty(text)) continue;
+            sb.Append('\n').Append(++index).Append('.').Append(text);
+        }
+        return sb.ToString();
+    }
+
+    public void AddFileReferences(IEnumerable<TodoFileReference> references)
+    {
+        foreach (var reference in references)
+        {
+            if (string.IsNullOrWhiteSpace(reference.Path)
+                || FileReferences.Any(existing => string.Equals(existing.Path, reference.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            FileReferences.Add(new TodoFileReferenceViewModel(reference, RemoveFileReference));
+        }
+
+        OnPropertyChanged(nameof(HasFileReferences));
+    }
+
+    private void RemoveFileReference(TodoFileReferenceViewModel reference)
+    {
+        FileReferences.Remove(reference);
+        OnPropertyChanged(nameof(HasFileReferences));
+    }
+
     [RelayCommand]
     private void AddComment()
     {
@@ -308,43 +414,40 @@ public sealed partial class TodoEditWindowViewModel : ObservableObject
 
 public sealed record TodoListOption(string Id, string Name, string? Status = null);
 
-public sealed record TodoCompanyOption(string? Id, string Name);
+public sealed record TodoCompanyOption(string? Id, string Name)
+{
+    // 可编辑 ComboBox 选中项显示依赖 ToString()（SelectionBoxItemTemplate 对可编辑模式无效），
+    // 不重写会直接显示记录的调试文本，如 "TodoCompanyOption { Id = ..., Name = ... }"。
+    public override string ToString() => Name;
+}
 
 public sealed class TodoLabelEditorViewModel : ObservableObject
 {
     private readonly Action<TodoLabelEditorViewModel> _remove;
-    private readonly IReadOnlyList<TodoLabelColorOptionViewModel> _colorOptions;
     private string _name;
     private string _color;
 
     public TodoLabelEditorViewModel(TodoLabel label, Action<TodoLabelEditorViewModel> remove)
     {
         Id = label.Id;
-        _name = label.Name;
+        _name = LimitName(label.Name);
         _color = TodoLabelColors.Normalize(label.Color);
         _remove = remove;
         RemoveCommand = new RelayCommand(() => _remove(this));
-        _colorOptions = TodoLabelColors.CommonColors
-            .Select(option => new TodoLabelColorOptionViewModel(
-                option,
-                string.Equals(option.Color, _color, StringComparison.OrdinalIgnoreCase),
-                selected => SelectColor(selected.Color)))
-            .ToList();
     }
 
     public string Id { get; }
     public string Color => _color;
     public SolidColorBrush BackgroundBrush => TodoLabelColors.CreateBrush(_color);
     public SolidColorBrush ForegroundBrush { get; } = TodoLabelColors.CreateBrush("#FFFFFF");
-    public IReadOnlyList<TodoLabelColorOptionViewModel> ColorOptions => _colorOptions;
     public RelayCommand RemoveCommand { get; }
     public string Name
     {
         get => _name;
-        set => SetProperty(ref _name, value);
+        set => SetProperty(ref _name, LimitName(value));
     }
 
-    private void SelectColor(string color)
+    internal void SetColor(string color)
     {
         var normalized = TodoLabelColors.Normalize(color);
         if (string.Equals(_color, normalized, StringComparison.OrdinalIgnoreCase))
@@ -353,8 +456,14 @@ public sealed class TodoLabelEditorViewModel : ObservableObject
         _color = normalized;
         OnPropertyChanged(nameof(Color));
         OnPropertyChanged(nameof(BackgroundBrush));
-        foreach (var option in _colorOptions)
-            option.SetSelected(string.Equals(option.Color, _color, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string LimitName(string? value)
+    {
+        var name = value ?? string.Empty;
+        return name.Length <= TodoEditWindowViewModel.MaxLabelNameLength
+            ? name
+            : name[..TodoEditWindowViewModel.MaxLabelNameLength];
     }
 }
 
@@ -391,7 +500,7 @@ public sealed class TodoLabelColorOptionViewModel : ObservableObject
     }
 
     public SolidColorBrush SelectionBorderBrush => IsSelected
-        ? TodoLabelColors.CreateBrush("#FFFFFF")
+        ? TodoLabelColors.CreateBrush("#000000")
         : TodoLabelColors.CreateBrush("#00000000");
 
     internal void SetSelected(bool isSelected)

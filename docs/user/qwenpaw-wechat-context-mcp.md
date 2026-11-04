@@ -4,7 +4,7 @@
 
 ## 需要准备
 
-- 运行 Fairy 的 Windows 计算机局域网 IP，例如 `192.168.1.20`；
+- Fairy 与 QwenPaw 同机时使用 `127.0.0.1`；仅在跨设备部署时填写 Fairy 所在 Windows 计算机的实际可达 IP；
 - QwenPaw 服务器能够访问该计算机的 TCP `18766` 端口；
 - Python 3；
 - QwenPaw 中负责微信分析的 Agent，当前默认是 `WeChatAnalysist`。
@@ -21,7 +21,7 @@ src/Lumine.Fairy.Desktop/wechat-context.local.json
 
 ```json
 {
-  "host": "192.168.1.20",
+  "host": "127.0.0.1",
   "port": 18766,
   "token": "两端共用的随机 Token",
   "timeoutSeconds": 10
@@ -62,13 +62,23 @@ wechat-context.local.json
 
 MCP 配置文件与 `server.py` 放在同一目录，启动时不需要额外的环境变量。
 
+## 配置微信分析 Skill
+
+将 [微信分析上下文 Skill](qwenpaw/skills/wechat-analysis-context/SKILL.md) 复制到 QwenPaw 的自定义 Skill 目录：
+
+```text
+%USERPROFILE%\\.qwenpaw\\customized_skills\\wechat-analysis-context\\SKILL.md
+```
+
+然后在 QwenPaw 的 **Agent > Skills** 中启用或重新加载。该 Skill 只在微信分析需要识别联系人、公司或项目时调用 `resolve_wechat_context`，不会读取 SQLite 或聊天正文。
+
 ## 验证
 
 在能访问 Fairy 的机器上执行：
 
 ```powershell
 Invoke-RestMethod `
-  -Uri 'http://192.168.1.20:18766/health' `
+  -Uri 'http://127.0.0.1:18766/health' `
   -Headers @{ Authorization = 'Bearer <Token>' }
 ```
 
@@ -86,7 +96,7 @@ Invoke-RestMethod `
 | --- | --- |
 | `connection refused` | 检查 Fairy 是否运行、IP/端口是否正确，以及 Windows 防火墙 |
 | `401 unauthorized` | 检查两份配置中的 Token 是否完全一致 |
-| `Access is denied` | 为 Fairy 的 IP 和端口添加 Windows URL ACL |
+| `Access is denied` | 同机部署先确认 Fairy 正在运行；跨设备部署时再为 Fairy 的实际 IP 和端口添加 Windows URL ACL |
 | MCP 没有工具 | 检查 `server.py` 与 `wechat-context.local.json` 是否在同一目录，并确认 MCP 使用 `stdio` |
 | `matched: false` | 检查本地联系人、微信会话 ID、公司和项目资料；不要自行猜测归属 |
 

@@ -1,10 +1,14 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Avalonia.Threading;
 using Lumine.Fairy.Desktop.ViewModels;
+using Lumine.Fairy.Desktop.Services;
+using Lumine.Fairy.Protocol;
 using AvaloniaControl = Avalonia.Controls.Control;
 using AvaloniaComboBox = Avalonia.Controls.ComboBox;
 using AvaloniaDragDropEffects = Avalonia.Input.DragDropEffects;
@@ -33,6 +37,7 @@ public partial class MainWindow : Window
         AddHandler(AvaloniaTextBox.TextChangedEvent, TodoCompanyFilterTextChanged);
         DataContextChanged += MainWindowDataContextChanged;
         MainWindowDataContextChanged(this, EventArgs.Empty);
+        AppClipboard.Provider = () => TopLevel.GetTopLevel(this)?.Clipboard;
     }
 
     private static void TodoCompanyFilterTextChanged(object? sender, Avalonia.Controls.TextChangedEventArgs e)
@@ -104,6 +109,16 @@ public partial class MainWindow : Window
             viewModel.LoadMoreNotificationsCommand.Execute(null);
     }
 
+    private void TodoListCardsScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scrollViewer
+            || scrollViewer.DataContext is not TodoListViewModel list
+            || scrollViewer.Extent.Height - scrollViewer.Offset.Y - scrollViewer.Viewport.Height >= 120)
+            return;
+
+        list.LoadNextCardBatch();
+    }
+
     private void NotificationSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (sender is Avalonia.Controls.ListBox listBox && listBox.SelectedIndex >= 0)
@@ -124,6 +139,16 @@ public partial class MainWindow : Window
         _dragStartPoint = e.GetPosition(control);
         _dragStarted = false;
         e.Pointer.Capture(control);
+    }
+
+    private async void TodoCardDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (IsTodoCardMoreSource(e.Source)
+            || sender is not AvaloniaControl { DataContext: WorkItemViewModel item })
+            return;
+
+        e.Handled = true;
+        await item.EditCommand.ExecuteAsync(null);
     }
 
     private void TodoCardPointerMoved(object? sender, PointerEventArgs e)
@@ -200,7 +225,7 @@ public partial class MainWindow : Window
             return;
 
         e.Handled = true;
-        var position = list.Cards.Count == 0 ? 0 : list.Cards.Max(card => card.Record.Position) + 1;
+        var position = list.AppendPosition;
         await viewModel.MoveTodoAsync(payload[5..], list.Id, position);
     }
 
@@ -283,7 +308,7 @@ public partial class MainWindow : Window
 
         if (payload.StartsWith("todo:", StringComparison.Ordinal))
         {
-            var position = target.Cards.Count == 0 ? 0 : target.Cards.Max(card => card.Record.Position) + 1;
+            var position = target.AppendPosition;
             await viewModel.MoveTodoAsync(payload[5..], target.Id, position);
         }
     }
@@ -350,10 +375,114 @@ public partial class MainWindow : Window
     private static void TodoCardMoreClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => e.Handled = true;
 
+    private async void SelectWechatDataDirectory_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel viewModel)
+            return;
+
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null)
+        {
+            viewModel.StatusMessage = "当前窗口无法打开文件夹选择器。";
+            return;
+        }
+
+        var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "选择微信数据根目录（包含 output 子目录）",
+            AllowMultiple = false,
+        });
+        var selectedPath = folders.Select(GetLocalPath).FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+        if (!string.IsNullOrWhiteSpace(selectedPath))
+            viewModel.SetWechatDataDirectory(selectedPath);
+    }
+
     private static bool IsTodoCardMoreSource(object? source)
         => source is AvaloniaControl control
            && (control.Classes.Contains("todo-card-more")
-               || control.FindAncestorOfType<Avalonia.Controls.Button>()?.Classes.Contains("todo-card-more") == true);
+               || control.Classes.Contains("todo-card-reference")
+               || control.Classes.Contains("todo-card-quick-delete")
+               || control.FindAncestorOfType<Avalonia.Controls.Button>()?.Classes.Contains("todo-card-more") == true
+               || control.FindAncestorOfType<Avalonia.Controls.Button>()?.Classes.Contains("todo-card-reference") == true
+               || control.FindAncestorOfType<Avalonia.Controls.Button>()?.Classes.Contains("todo-card-quick-delete") == true);
+
+    private async void TodoCardAddFileReference_Click(object? sender, RoutedEventArgs e)
+        => await AddTodoReferenceFromCardAsync(sender, isDirectory: false);
+
+    private async void TodoCardAddFolderReference_Click(object? sender, RoutedEventArgs e)
+        => await AddTodoReferenceFromCardAsync(sender, isDirectory: true);
+
+    private async Task AddTodoReferenceFromCardAsync(object? sender, bool isDirectory)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { DataContext: WorkItemViewModel item })
+            return;
+        if (DataContext is not MainWindowViewModel viewModel)
+            return;
+        var storageProvider = TopLevel.GetTopLevel(this)?.StorageProvider;
+        if (storageProvider is null)
+            return;
+
+        IReadOnlyList<IStorageItem> picked;
+        if (isDirectory)
+        {
+            picked = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "选择要引用的文件夹",
+                AllowMultiple = true,
+            });
+        }
+        else
+        {
+            picked = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "选择要引用的文件",
+                AllowMultiple = true,
+            });
+        }
+
+        var references = picked
+            .Select(GetLocalPath)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => new TodoFileReference(path, isDirectory))
+            .ToList();
+
+        if (references.Count == 0)
+            return;
+
+        await viewModel.AddTodoReferencesAsync(item.Record, references);
+    }
+
+    private static string GetLocalPath(IStorageItem item)
+        => item.TryGetLocalPath() ?? item.Path?.LocalPath ?? string.Empty;
+
+    private async void TodoCardCopyAsText_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { DataContext: WorkItemViewModel item })
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+            return;
+
+        var text = string.IsNullOrWhiteSpace(item.Record.Summary)
+            ? item.Record.Title
+            : $"{item.Record.Title}\n{item.Record.Summary}";
+
+        await clipboard.SetTextAsync(text);
+
+        if (DataContext is MainWindowViewModel viewModel)
+            viewModel.StatusMessage = "已复制为文本。";
+    }
+
+    private async void TodoFileReferenceCopyPath_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { DataContext: TodoFileReferenceViewModel reference })
+            return;
+
+        if (await AppClipboard.TrySetTextAsync(reference.FullPath)
+            && DataContext is MainWindowViewModel viewModel)
+            viewModel.StatusMessage = "已复制文件地址。";
+    }
 
     private void ShowDragPreview(string text, AvaloniaPoint pointerPosition)
     {
@@ -422,7 +551,7 @@ public partial class MainWindow : Window
         var targetList = FindDataContext<TodoListViewModel>(hit);
         if (targetList is not null)
         {
-            var position = targetList.Cards.Count;
+            var position = targetList.TotalCardCount;
             await viewModel.MoveTodoAsync(item.Id, targetList.Id, position);
         }
     }

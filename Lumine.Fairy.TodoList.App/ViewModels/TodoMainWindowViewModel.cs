@@ -261,8 +261,8 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     {
         get
         {
-            var endDate = ResolveSelectedTodoWorkDate();
-            var startDate = endDate.AddDays(-6);
+            // 与上传弹窗的默认选中范围保持一致：基准恒为今天，忽略用户改过的 TodoWorkDate
+            var (startDate, endDate) = ResolvePreviousCalendarWeek(DateOnly.FromDateTime(DateTime.Today));
             return $"默认上传范围：{startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}";
         }
     }
@@ -271,8 +271,8 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
     {
         get
         {
-            var endDate = ResolveSelectedTodoWorkDate();
-            var startDate = endDate.AddDays(-6);
+            // 与上传弹窗的默认选中范围保持一致：基准恒为今天，忽略用户改过的 TodoWorkDate
+            var (startDate, endDate) = ResolvePreviousCalendarWeek(DateOnly.FromDateTime(DateTime.Today));
             return $"选择时间段上传日报（默认 {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}）";
         }
     }
@@ -625,8 +625,7 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
             return;
         }
 
-        var defaultEndDate = ResolveSelectedTodoWorkDate();
-        var defaultStartDate = defaultEndDate.AddDays(-6);
+        var (defaultStartDate, defaultEndDate) = ResolvePreviousCalendarWeek(DateOnly.FromDateTime(DateTime.Today));
         var selectedRange = await _dailyReportUploadRangeSelectionService.SelectRangeAsync(defaultStartDate, defaultEndDate, CancellationToken.None);
         if (selectedRange is null)
         {
@@ -1953,6 +1952,13 @@ public sealed partial class TodoMainWindowViewModel : ObservableObject
 
     private DateOnly ResolveSelectedTodoWorkDate()
         => TodoWorkDate.HasValue ? DateOnly.FromDateTime(TodoWorkDate.Value.DateTime) : DateOnly.FromDateTime(DateTime.Today);
+
+    private static (DateOnly StartDate, DateOnly EndDate) ResolvePreviousCalendarWeek(DateOnly referenceDate)
+    {
+        var daysSinceMonday = ((int)referenceDate.DayOfWeek + 6) % 7;
+        var currentWeekMonday = referenceDate.AddDays(-daysSinceMonday);
+        return (currentWeekMonday.AddDays(-7), currentWeekMonday.AddDays(-1));
+    }
 
     private int NextTodoSortOrder()
         => TodoEntries.Count == 0 ? 1 : TodoEntries.Max(static item => item.SortOrder) + 1;

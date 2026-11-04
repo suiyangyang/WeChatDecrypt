@@ -8,7 +8,18 @@
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
-  
+
+    <!-- 原生菜单（ContextMenu/MenuFlyout）外观覆盖：与托盘菜单、通知中心 more-menu 保持一致。
+         以下资源覆盖只影响 Fluent 主题中菜单相关模板的取值（菜单容器背景/边框/圆角/内边距/条目间距）。 -->
+    <Application.Resources>
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#DCE3EC" />
+        <CornerRadius x:Key="OverlayCornerRadius">12</CornerRadius>
+        <Thickness x:Key="FlyoutBorderThemePadding">8</Thickness>
+        <Thickness x:Key="MenuFlyoutPresenterThemePadding">8</Thickness>
+        <Thickness x:Key="MenuFlyoutScrollerMargin">0</Thickness>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
         <Style Selector="TemplatedControl">
@@ -43,6 +54,80 @@
         </Style>
         <Style Selector="ListBoxItem:pressed">
             <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <!-- 原生菜单容器：白底、#DCE3EC 描边、12 圆角、8 内边距、柔和阴影、最小宽度 180。
+             背景/边框/圆角/内边距由上方 Application.Resources 覆盖提供（模板内为 DynamicResource 本地值，样式无法覆盖）；
+             此处仅补充 MinWidth 与模板根 Border 的 BoxShadow（模板未设置该属性，样式可直接生效）。 -->
+        <Style Selector="ContextMenu">
+            <Setter Property="MinWidth" Value="180" />
+        </Style>
+        <Style Selector="MenuFlyoutPresenter">
+            <Setter Property="MinWidth" Value="180" />
+        </Style>
+        <Style Selector="ContextMenu /template/ Border">
+            <Setter Property="BoxShadow" Value="0 8 24 0 #30000000" />
+        </Style>
+        <Style Selector="MenuFlyoutPresenter /template/ Border#LayoutRoot">
+            <Setter Property="BoxShadow" Value="0 8 24 0 #30000000" />
+        </Style>
+        <!-- 子菜单弹出容器（MenuItem 模板内 PART_Popup 的 Border）同样加阴影 -->
+        <Style Selector="MenuItem /template/ Popup#PART_Popup > Border">
+            <Setter Property="BoxShadow" Value="0 8 24 0 #30000000" />
+        </Style>
+        <!-- 菜单条目：#142033 文本、12 字号、透明底、6 圆角、10,6 内边距、28 最小高度（模板 PART_LayoutRoot 经 TemplateBinding 继承） -->
+        <Style Selector="MenuItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#142033" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="MinHeight" Value="28" />
+        </Style>
+        <!-- 悬停/选中：条目背景 #F1F4F8，文本保持 #142033 -->
+        <Style Selector="MenuItem:selected /template/ Border#PART_LayoutRoot">
+            <Setter Property="Background" Value="#F1F4F8" />
+        </Style>
+        <Style Selector="MenuItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="Foreground" Value="#142033" />
+        </Style>
+        <!-- 按下：条目背景 #E6EBF2（选择器与主题内置 :pressed 规则同形，应用层后定义故优先生效） -->
+        <Style Selector="MenuItem:pressed /template/ Border#PART_LayoutRoot:pointerover">
+            <Setter Property="Background" Value="#E6EBF2" />
+        </Style>
+        <Style Selector="MenuItem:pressed /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="Foreground" Value="#142033" />
+        </Style>
+        <!-- 菜单图标：13px 线性 SVG 图标（Path 描边风格，24x24 视口等比缩放），颜色比文字略浅 -->
+        <Style Selector="Path.menu-icon">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Stroke" Value="#56657A" />
+            <Setter Property="StrokeThickness" Value="1.8" />
+            <Setter Property="StrokeLineCap" Value="Round" />
+            <Setter Property="StrokeJoin" Value="Round" />
+        </Style>
+        <!-- 危险操作（删除）：文字与图标使用 #D93025 红色，悬停/按下时保持红色 -->
+        <Style Selector="Path.menu-icon.danger">
+            <Setter Property="Stroke" Value="#D93025" />
+        </Style>
+        <Style Selector="MenuItem.danger">
+            <Setter Property="Foreground" Value="#D93025" />
+        </Style>
+        <Style Selector="MenuItem.danger:selected /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="Foreground" Value="#D93025" />
+        </Style>
+        <Style Selector="MenuItem.danger:pressed /template/ ContentPresenter#PART_HeaderPresenter">
+            <Setter Property="Foreground" Value="#D93025" />
+        </Style>
+        <!-- 菜单分组分隔线：1px 细线，上下留 4px 间距 -->
+        <Style Selector="Separator">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,4" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="#E3E8F0" />
         </Style>
     </Application.Styles>
 </Application>

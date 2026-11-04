@@ -8,7 +8,9 @@ public sealed class AppSettings
 {
     public string TimeZoneId { get; set; } = TimeZoneContext.DefaultTimeZoneId;
     public string? WeChatAnalysisAgentId { get; set; }
+    public string? WeChatDataDirectory { get; set; }
     public WeChatAnalysisSettings WeChatAnalysis { get; set; } = new();
+    public WorkSettings Work { get; set; } = new();
 
     public AppSettings() { }
 
@@ -30,7 +32,7 @@ public sealed class AppSettingsStore
         _path = path ?? Path.Combine(root, "settings.json");
     }
 
-    public AppSettings Load()
+    public AppSettings Load(Action<Exception?>? onFallback = null)
     {
         try
         {
@@ -40,13 +42,23 @@ public sealed class AppSettingsStore
                 if (settings is not null && !string.IsNullOrWhiteSpace(settings.TimeZoneId))
                 {
                     settings.WeChatAnalysis ??= new WeChatAnalysisSettings();
+                    settings.Work ??= new WorkSettings();
                     return settings;
                 }
             }
         }
-        catch (IOException) { }
-        catch (JsonException) { }
+        catch (IOException ex)
+        {
+            onFallback?.Invoke(ex);
+            return new AppSettings(TimeZoneContext.DefaultTimeZoneId);
+        }
+        catch (JsonException ex)
+        {
+            onFallback?.Invoke(ex);
+            return new AppSettings(TimeZoneContext.DefaultTimeZoneId);
+        }
 
+        onFallback?.Invoke(null);
         return new AppSettings(TimeZoneContext.DefaultTimeZoneId);
     }
 

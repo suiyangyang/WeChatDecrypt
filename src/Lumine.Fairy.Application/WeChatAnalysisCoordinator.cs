@@ -55,7 +55,10 @@ public sealed class WeChatAnalysisCoordinator(
             }
 
             if (workItems.Count == 0)
-                throw FailAndCreateException(progress, "read-messages", "匹配的微信会话没有可分析的新消息。");
+            {
+                progress.Finish("匹配的微信会话没有可分析的新消息。");
+                throw new NoPendingWeChatMessagesException("匹配的微信会话没有可分析的新消息。");
+            }
 
             return await AnalyzeRoundAsync(workItems, agentId, progress, cancellationToken);
         }
@@ -87,11 +90,13 @@ public sealed class WeChatAnalysisCoordinator(
         IReadOnlyList<WeChatAnalysisWorkItem> workItems,
         string agentId,
         Func<WeChatAnalysisWorkItem, Task>? onItemCompleted,
+        AnalysisProgressTracker? progress = null,
         CancellationToken cancellationToken = default)
     {
         var first = workItems.FirstOrDefault()
                     ?? throw new InvalidOperationException("本轮没有可分析的新消息。");
-        var progress = CreateProgress(first.Account.DisplayName, first.Session.DisplayName);
+        progress ??= CreateProgress(first.Account.DisplayName, first.Session.DisplayName);
+        progress.SetContext(first.Account.DisplayName, first.Session.DisplayName);
         return AnalyzeRoundAsync(workItems, agentId, progress, cancellationToken, onItemCompleted);
     }
 
@@ -113,7 +118,7 @@ public sealed class WeChatAnalysisCoordinator(
             "正在创建本轮 QwenPaw 分析会话",
             async token =>
             {
-                await qwenPaw.CreateSessionAsync(roundSessionId, roundTitle, token);
+                await qwenPaw.CreateSessionAsync(agentId, roundSessionId, roundTitle, token);
                 return true;
             },
             cancellationToken,
@@ -287,15 +292,20 @@ public sealed class WeChatAnalysisCoordinator(
                 new Dictionary<string, object?> { ["questionId"] = question.Id }), cancellationToken);
             }
 
-            await notifications.PublishAsync(new NotificationRequest(
-            "微信分析完成",
-            $"已分析“{session.DisplayName}”最近 {messages.Count} 条消息，发现 {analysis.Todos?.Count ?? 0} 个工作候选，目标 Agent：{agentId}。",
-            "wechat-analysis",
-            "wechat",
-            "success",
-            "timeout",
-            8,
-            $"analysis:{account.Id}:{session.Username}:{messages.Max(x => x.Id)}"), cancellationToken);
+            var hasWorkContent = (Allows(WeChatAnalysisContentType.Todo) && (analysis.Todos?.Count ?? 0) > 0)
+                                 || (Allows(WeChatAnalysisContentType.CustomerQuestion) && (analysis.Questions?.Count ?? 0) > 0);
+            if (Settings.NotifyAfterEveryAnalysis || (Settings.NotifyWhenWorkContentFound && hasWorkContent))
+            {
+                await notifications.PublishAsync(new NotificationRequest(
+                    "微信分析完成",
+                    $"已分析“{session.DisplayName}”最近 {messages.Count} 条消息，发现 {analysis.Todos?.Count ?? 0} 个工作候选，目标 Agent：{agentId}。",
+                    "wechat-analysis",
+                    "wechat",
+                    "success",
+                    "timeout",
+                    8,
+                    $"analysis:{account.Id}:{session.Username}:{messages.Max(x => x.Id)}"), cancellationToken);
+            }
 
             progress.Complete("persist", "TODO 候选和通知已保存");
             return result.Text;
@@ -307,9 +317,10 @@ public sealed class WeChatAnalysisCoordinator(
         }
     }
 
-    public async Task<string> HandleNotificationActionAsync(NotificationRecord notification, string actionId, string agentId, CancellationToken cancellationToken = default)
+    public async Task<NotificationActionResult> HandleNotificationActionAsync(NotificationRecord notification, string actionId, string agentId, CancellationToken cancellationToken = default)
     {
-        if (notification.IsResolved) throw new InvalidOperationException("该通知已经处理，不能重复执行。");
+        if (notification.IsResolved)
+            return new NotificationActionResult(NotificationAlreadyHandledMessage, AlreadyHandled: true);
         var action = notification.Actions.FirstOrDefault(x => x.Id.Equals(actionId, StringComparison.OrdinalIgnoreCase));
         if (action is null) throw new InvalidOperationException("通知操作不存在或已失效。");
 
@@ -318,35 +329,50 @@ public sealed class WeChatAnalysisCoordinator(
         {
             var todoId = GetPayloadString(notification, "todoId");
             if (string.IsNullOrWhiteSpace(todoId)) throw new InvalidOperationException("通知缺少 TODO 标识。");
-            var todo = action.Kind.Equals("confirm-todo", StringComparison.OrdinalIgnoreCase)
+            var isConfirmed = action.Kind.Equals("confirm-todo", StringComparison.OrdinalIgnoreCase);
+            var todo = isConfirmed
                 ? await _todos.ConfirmAsync(todoId, cancellationToken)
                 : await _todos.RejectAsync(todoId, cancellationToken);
-            if (todo is null) throw new InvalidOperationException("TODO 候选不存在。");
-            await notifications.ResolveAsync(notification.Id, cancellationToken);
-            var isConfirmed = action.Kind.Equals("confirm-todo", StringComparison.OrdinalIgnoreCase);
-            var message = isConfirmed
-                ? $"已将“{todo.Title}”加入 TODO。"
-                : $"已忽略工作候选“{todo.Title}”。";
-            await notifications.PublishAsync(new NotificationRequest(
-                isConfirmed ? "TODO 已确认" : "工作候选已忽略",
-                message,
-                "wechat-analysis",
-                "work",
-                "success",
-                "timeout",
-                8,
-                $"todo-action:{notification.Id}:{action.Id}"), cancellationToken);
-            return message;
+            if (todo is null)
+            {
+                await notifications.ResolveAsync(notification.Id, cancellationToken: cancellationToken);
+                return new NotificationActionResult(
+                    HandledInWorkListMessage(await _todos.GetAsync(todoId, cancellationToken)),
+                    AlreadyHandled: true);
+            }
+            await notifications.ResolveAsync(notification.Id, isConfirmed ? AddedToTodoLabel : HandledLabel, cancellationToken);
+            return new NotificationActionResult(isConfirmed
+                ? $"已加入 TODO：{todo.Title}"
+                : $"已处理，不会加入 TODO：{todo.Title}");
         }
 
         if (action.Kind.Equals("question-solution", StringComparison.OrdinalIgnoreCase))
         {
-            return await HandleQuestionResponseAsync(notification, new NotificationResponse(action.Id, null), agentId, cancellationToken);
+            return new NotificationActionResult(await HandleQuestionResponseAsync(notification, new NotificationResponse(action.Id, null), agentId, cancellationToken));
         }
 
-        await notifications.ResolveAsync(notification.Id, cancellationToken);
-        return "通知已处理。";
+        await notifications.ResolveAsync(notification.Id, HandledLabel, cancellationToken);
+        return new NotificationActionResult("通知已处理。");
     }
+
+    private const string HandledLabel = "已处理";
+    private const string AddedToTodoLabel = "已加入TODO";
+    private const string NotificationAlreadyHandledMessage = "这条通知已经处理过，无需重复处理。";
+
+    private static string HandledInWorkListMessage(TodoRecord? todo)
+        => todo is null
+            ? "这条消息对应的工作项已不存在，已标记为已处理。"
+            : $"这条消息已在工作列表处理过（{(todo.IsArchived ? "已归档" : FormatTodoStatus(todo.Status))}），已标记为已处理。";
+
+    private static string FormatTodoStatus(string status) => status switch
+    {
+        "pending_confirmation" => "待确认",
+        "pending" => "待办",
+        "in_progress" => "进行中",
+        "completed" => "已完成",
+        "rejected" => "已忽略",
+        _ => status,
+    };
 
     public async Task<string> HandleQuestionResponseAsync(NotificationRecord notification, NotificationResponse response, string agentId, CancellationToken cancellationToken = default)
     {
@@ -361,7 +387,7 @@ public sealed class WeChatAnalysisCoordinator(
 
         var prompt = $"用户已处理微信分析中的疑问。问题：{notification.Question.Problem}\n来源：{notification.Question.Source.From} 与 {notification.Question.Source.To}\n用户指示：{instruction}\n请根据用户指示确认后续需要做什么，并给出简短结论。";
         var result = await qwenPaw.ChatAsync(agentId, prompt, cancellationToken);
-        await notifications.ResolveAsync(notification.Id, cancellationToken);
+        await notifications.ResolveAsync(notification.Id, HandledLabel, cancellationToken);
         await notifications.PublishAsync(new NotificationRequest(
             "微信疑问已提交",
             result.Text.Length > 300 ? result.Text[..300] : result.Text,
@@ -373,6 +399,10 @@ public sealed class WeChatAnalysisCoordinator(
             $"question-response:{notification.Id}:{response.SolutionId}:{response.CustomInput}"), cancellationToken);
         return result.Text;
     }
+
+    /// <summary>创建一轮分析的进度跟踪器，构造时会立即向界面发布初始快照。</summary>
+    internal AnalysisProgressTracker BeginProgress(string accountDisplayName, string conversationDisplayName)
+        => CreateProgress(accountDisplayName, conversationDisplayName);
 
     private AnalysisProgressTracker CreateProgress(string accountDisplayName, string conversationDisplayName)
         => new(accountDisplayName, conversationDisplayName, snapshot => ProgressChanged?.Invoke(this, snapshot));
@@ -527,6 +557,7 @@ internal sealed class AnalysisProgressTracker
     public int CurrentContactIndex { get; private set; }
     public int CompletedContacts { get; private set; }
     public string Notice { get; private set; } = string.Empty;
+    public bool IsFinished { get; private set; }
 
     public void SetRound(string roundTitle, int totalContacts, int totalMessages)
     {
@@ -554,6 +585,36 @@ internal sealed class AnalysisProgressTracker
         Emit();
     }
 
+    /// <summary>
+    /// 本轮无需提交 QwenPaw 时正常收尾：跳过剩余阶段并直接完成，
+    /// 界面据此显示已完成、停止计时并刷新上次分析结束时间。
+    /// </summary>
+    public void Finish(string notice)
+    {
+        IsFinished = true;
+        Notice = notice;
+        var now = DateTimeOffset.UtcNow;
+        for (var index = 0; index < _stages.Count; index++)
+        {
+            var stage = _stages[index];
+            if (stage.Id == "complete") continue;
+            if (stage.Status == "running")
+                _stages[index] = stage with { Status = "completed", CompletedAt = now };
+            else if (stage.Status == "pending")
+                _stages[index] = stage with { Status = "skipped", Detail = "本轮无需执行，已跳过", StartedAt = now, CompletedAt = now };
+        }
+        var completeIndex = _stages.FindIndex(stage => stage.Id == "complete");
+        _stages[completeIndex] = _stages[completeIndex] with
+        {
+            Status = "completed",
+            Detail = notice,
+            StartedAt = _stages[completeIndex].StartedAt ?? now,
+            CompletedAt = now,
+            Error = null,
+        };
+        Emit();
+    }
+
     public void SetContext(string accountDisplayName, string conversationDisplayName)
     {
         AccountDisplayName = accountDisplayName;
@@ -567,12 +628,15 @@ internal sealed class AnalysisProgressTracker
     public void Complete(string id, string detail)
     {
         var stage = _stages.First(x => x.Id == id);
+        if (id == "complete") IsFinished = true;
         Update(id, "completed", detail, stage.StartedAt ?? DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null);
     }
 
     public void FailCurrent(string error)
     {
         if (_stages.Any(x => x.Status == "error")) return;
+        // 本轮已正常收尾（例如没有待分析的新消息）时，后续异常不再改写阶段状态。
+        if (IsFinished) return;
         var stage = _stages.FirstOrDefault(x => x.Status == "running")
                     ?? _stages.FirstOrDefault(x => x.Status == "pending")
                     ?? _stages.Last();
@@ -613,5 +677,6 @@ internal sealed class AnalysisProgressTracker
             TotalMessages,
             CurrentContactIndex,
             CompletedContacts,
-            Notice));
+            Notice,
+            IsFinished));
 }

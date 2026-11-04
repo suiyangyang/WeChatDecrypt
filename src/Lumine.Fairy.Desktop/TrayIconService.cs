@@ -42,6 +42,7 @@ public sealed class TrayIconService : IDisposable
             ContextMenuStrip = CreateContextMenu(),
         };
         _notifyIcon.DoubleClick += (_, _) => ShowWindow();
+        _notifyIcon.BalloonTipClicked += (_, _) => ShowWindow();
     }
 
     private ContextMenuStrip CreateContextMenu()

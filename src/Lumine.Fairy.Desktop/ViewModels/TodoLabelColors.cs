@@ -46,6 +46,26 @@ public static class TodoLabelColors
             return new SolidColorBrush(AvaloniaColor.Parse(DefaultColor));
         }
     }
+
+    public static SolidColorBrush CreateReferenceBrush(string? labelColor)
+    {
+        var normalized = Normalize(labelColor);
+        if (string.Equals(normalized, DefaultColor, StringComparison.OrdinalIgnoreCase))
+            return CreateBrush("#2F67B1");
+
+        try
+        {
+            var color = AvaloniaColor.Parse(normalized);
+            var red = (byte)Math.Clamp(color.R * 0.82 + 255 * 0.18, 0, 255);
+            var green = (byte)Math.Clamp(color.G * 0.82 + 255 * 0.18, 0, 255);
+            var blue = (byte)Math.Clamp(color.B * 0.82 + 255 * 0.18, 0, 255);
+            return new SolidColorBrush(new AvaloniaColor(color.A, red, green, blue));
+        }
+        catch (FormatException)
+        {
+            return CreateBrush("#2F67B1");
+        }
+    }
 }
 
 public sealed record TodoLabelColorDefinition(string Name, string Color);

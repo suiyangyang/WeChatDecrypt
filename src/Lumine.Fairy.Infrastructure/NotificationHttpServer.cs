@@ -131,7 +131,7 @@ public sealed class NotificationHttpServer : IAsyncDisposable
                         return;
                     }
                     var result = await _analysis.HandleNotificationActionAsync(notification, actionId, "default");
-                    await WriteAsync(context.Response, 200, new { status = "completed", notificationId = notification.Id, message = result });
+                    await WriteAsync(context.Response, 200, new { status = "completed", notificationId = notification.Id, message = result.Message, alreadyHandled = result.AlreadyHandled });
                     return;
                 }
 

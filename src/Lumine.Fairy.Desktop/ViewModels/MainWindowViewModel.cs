@@ -188,7 +188,13 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
     {
         _settingsStore = new AppSettingsStore();
         _startupService = new WindowsStartupService();
-        _appSettings = _settingsStore.Load();
+        LifecycleLog.Info("主窗口构造：开始读取本地设置。");
+        _appSettings = _settingsStore.Load(ex =>
+        {
+            LifecycleLog.Warn("本地设置无法加载，使用默认配置（文件缺失、内容无效或读取异常）。");
+            if (ex is not null) LifecycleLog.InitializationFailure("读取本地设置", ex);
+        });
+        LifecycleLog.Info($"主窗口构造：本地设置读取返回；数据根目录={Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumine.Fairy")}");
         _wechatAnalysisSettings = _appSettings.WeChatAnalysis ?? new WeChatAnalysisSettings();
         _notifyAfterEveryAnalysis = _wechatAnalysisSettings.NotifyAfterEveryAnalysis;
         _notifyWhenWorkContentFound = _wechatAnalysisSettings.NotifyWhenWorkContentFound;
@@ -250,6 +256,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         _qwenPaw = new QwenPawClient(new ProtectedTokenStore());
         _qwenpawCredentials = new ProtectedCredentialStore();
         _wechat = new WeChatDataAnalysisClient(dataRoot: _appSettings.WeChatDataDirectory);
+        LifecycleLog.Info($"主窗口构造：存储服务已创建；微信数据目录={_wechat.DataRoot}");
         WechatDataDirectory = _wechat.DataRoot;
         var contactWorkspaceService = new ContactManagementWorkspaceService(_contactManagementStore, contactValidationService);
         IDataImportService contactImportService = new ContactDomainDataImportService(_contactManagementStore, contactStorageOptions, contactValidationService);
@@ -258,6 +265,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             _contactManagementStore,
             new WeChatGroupChatProvider(_wechat));
         var contactSnapshot = contactWorkspaceService.LoadAsync().GetAwaiter().GetResult();
+        LifecycleLog.Info("主窗口构造：联系人快照已加载。");
         ContactManagementViewModel = new ContactMainWindowViewModel(
             contactStorageOptions.DatabaseFilePath,
             contactWorkspaceService,
@@ -564,32 +572,56 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
 
     private async Task InitializeAsync()
     {
+        LifecycleLog.Info($"开始主窗口异步初始化；通知接口绑定={_notificationApi.BindAddress} 端口={_notificationApi.Port}");
         try
         {
-            await _notificationApi.StartAsync();
+            await RunInitializationStageAsync("启动通知 HTTP 接口", () => _notificationApi.StartAsync());
             IsNotificationApiRunning = true;
             if (_wechatContextApi is not null)
             {
                 try
                 {
-                    await _wechatContextApi.StartAsync();
+                    await RunInitializationStageAsync("启动微信上下文 MCP", () => _wechatContextApi.StartAsync());
                 }
                 catch (Exception ex)
                 {
                     StatusMessage = $"微信上下文 MCP 未启动：{ex.Message}";
                 }
             }
-            await ReloadNotificationsAsync();
-            await ReloadWorkPageAsync();
-            await LoadWechatWhitelistAsync();
-            await RefreshWechatDataAccessAuthorizationCoreAsync(false);
+            await RunInitializationStageAsync("加载通知", ReloadNotificationsAsync);
+            LifecycleLog.Info($"通知加载返回；当前页数量={Notifications.Count} 未读数量={UnreadCount}");
+            await RunInitializationStageAsync("加载工作看板", ReloadWorkPageAsync);
+            LifecycleLog.Info($"工作看板加载返回；任务数量={_allWorkItems.Count} 列数量={TodoLists.Count}");
+            await RunInitializationStageAsync("加载微信白名单", LoadWechatWhitelistAsync);
+            await RunInitializationStageAsync("检查微信数据访问授权", () => RefreshWechatDataAccessAuthorizationCoreAsync(false));
+            LifecycleLog.Info($"微信数据访问检查返回；状态={WechatDataAccessStatusText}");
             _todoCleanup.Start();
+            LifecycleLog.Info("归档任务清理调度器已启动。");
 
-            await TryAutoLoginAsync();
+            await RunInitializationStageAsync("恢复 QwenPaw 登录", TryAutoLoginAsync);
+            LifecycleLog.Info($"QwenPaw 登录恢复返回；已连接={IsQwenPawConnected}");
+            LifecycleLog.Info("主窗口异步初始化完成。");
         }
         catch (Exception ex)
         {
+            LifecycleLog.Info("主窗口异步初始化中断，后续阶段未执行。");
             StatusMessage = $"初始化失败：{ex.Message}";
+        }
+    }
+
+    private static async Task RunInitializationStageAsync(string stage, Func<Task> action)
+    {
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        LifecycleLog.Info($"初始化阶段开始：{stage}");
+        try
+        {
+            await action();
+            LifecycleLog.Info($"初始化阶段完成：{stage}；耗时={timer.ElapsedMilliseconds}ms");
+        }
+        catch (Exception ex)
+        {
+            LifecycleLog.InitializationFailure(stage, ex);
+            throw;
         }
     }
 
@@ -621,6 +653,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         }
         catch (Exception ex)
         {
+            LifecycleLog.InitializationFailure("读取已保存的 QwenPaw 登录信息", ex);
             StatusMessage = $"读取已保存的 QwenPaw 登录信息失败：{ex.Message}";
             return null;
         }
@@ -854,6 +887,14 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(status.BackendVersionStatus))
+        {
+            WechatDataAccessStatusText = "连接失败";
+            WechatDataAccessDetailText = $"数据库密钥已存在，但无法连接微信解析服务。版本检查：{status.BackendVersionStatus}"
+                                         + "点击“重新检测”重试连接，并查看后端日志。";
+            return;
+        }
+
         WechatDataAccessStatusText = "待连接";
         WechatDataAccessDetailText = "数据库密钥已存在。点击“重新检测”启动并连接微信解析服务。";
     }
@@ -1038,6 +1079,7 @@ public partial class MainWindowViewModel : ViewModelBase, IAsyncDisposable
         catch (Exception ex)
         {
             IsQwenPawConnected = false;
+            LifecycleLog.InitializationFailure("QwenPaw 登录", ex);
             StatusMessage = isAutoLogin
                 ? $"QwenPaw 自动登录失败：{ex.Message}，请到设置-微信分析检查服务器地址和密码。"
                 : $"QwenPaw 登录失败：{ex.Message}";
@@ -2616,6 +2658,11 @@ public sealed class WorkItemViewModel : ObservableObject
     public string ArchiveActionText => Record.IsArchived ? "恢复" : "归档";
     public bool CanMoveToCompleted => Record.Status.Equals("pending", StringComparison.OrdinalIgnoreCase)
         || Record.Status.Equals("in_progress", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 待确认列中的卡片在悬浮时显示删除按钮，点击后走与“更多”菜单一致的确认删除流程。
+    /// </summary>
+    public bool CanQuickDelete => Record.Status.Equals("pending_confirmation", StringComparison.OrdinalIgnoreCase);
 
     public void RefreshDueDateState()
     {

@@ -40,6 +40,7 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <ApplicationIcon>Assets\fairy-shortcut.ico</ApplicationIcon>
     <Win32Icon>Assets\fairy-shortcut.ico</Win32Icon>
   </PropertyGroup>
 

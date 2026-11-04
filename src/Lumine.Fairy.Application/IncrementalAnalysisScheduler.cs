@@ -13,25 +13,45 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
     private readonly IQwenPawClient _qwenPaw;
     private readonly WeChatAnalysisCoordinator _coordinator;
     private readonly NotificationService _notifications;
+    private static readonly TimeSpan RoundHandoffTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan CollectionReportInterval = TimeSpan.FromMilliseconds(500);
+
     private readonly Dictionary<string, string> _cursors;
     private readonly object _cursorGate = new();
+    private readonly object _delayGate = new();
     private readonly SemaphoreSlim _cursorOperationGate = new(1, 1);
-    private readonly string _cursorPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumine.Fairy", "analysis-cursors.json");
+    private readonly string _cursorPath;
+    private int _roundRunningCount;
+    private volatile bool _immediateRunRequested;
     private CancellationTokenSource? _cts;
     private Task? _worker;
 
-    public IncrementalAnalysisScheduler(IWeChatService weChat, IQwenPawClient qwenPaw, WeChatAnalysisCoordinator coordinator, NotificationService notifications)
+    public IncrementalAnalysisScheduler(
+        IWeChatService weChat,
+        IQwenPawClient qwenPaw,
+        WeChatAnalysisCoordinator coordinator,
+        NotificationService notifications,
+        string? cursorPath = null)
     {
         _weChat = weChat;
         _qwenPaw = qwenPaw;
         _coordinator = coordinator;
         _notifications = notifications;
+        _cursorPath = cursorPath ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lumine.Fairy", "analysis-cursors.json");
         _cursors = LoadCursors(_cursorPath);
     }
 
     public bool IsRunning => _worker is { IsCompleted: false };
+
+    /// <summary>是否有一轮微信分析（手动或自动）正在执行。</summary>
+    public bool IsRoundRunning => Volatile.Read(ref _roundRunningCount) > 0;
+
+    /// <summary>是否已有请求排队，等待当前轮次结束后立即补跑。</summary>
+    public bool IsRunQueued => _immediateRunRequested;
     private WeChatAnalysisSettings _settings = new();
     private bool _usesConfiguredInterval = true;
+    private CancellationTokenSource? _delayCts;
 
     public TimeSpan Interval { get; private set; } = TimeSpan.FromMinutes(WeChatAnalysisSettings.DefaultAnalysisIntervalMinutes);
     public string AgentId { get; set; } = "default";
@@ -42,7 +62,24 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         {
             _settings = value ?? new WeChatAnalysisSettings();
             if (_usesConfiguredInterval)
-                Interval = GetConfiguredInterval(_settings);
+                ApplyInterval(GetConfiguredInterval(_settings));
+        }
+    }
+
+    private void ApplyInterval(TimeSpan interval)
+    {
+        if (Interval == interval) return;
+        Interval = interval;
+        CancelPendingDelay();
+    }
+
+    /// <summary>中断当前等待：间隔变更时只重新计时，存在排队请求时立即补跑一轮。</summary>
+    private void CancelPendingDelay()
+    {
+        lock (_delayGate)
+        {
+            try { _delayCts?.Cancel(); }
+            catch (ObjectDisposedException) { }
         }
     }
     public IReadOnlyList<WeChatWhitelistEntry> Whitelist { get; set; } = [];
@@ -55,6 +92,17 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         Interval = interval ?? GetConfiguredInterval(Settings);
         _cts = new CancellationTokenSource();
         _worker = Task.Run(() => RunAsync(_cts.Token), _cts.Token);
+    }
+
+    /// <summary>
+    /// 请求立即补跑一轮：打断正在等待的间隔，多次请求合并为一轮。调度器未运行时返回 false。
+    /// </summary>
+    public bool RequestImmediateRun()
+    {
+        if (!IsRunning) return false;
+        _immediateRunRequested = true;
+        CancelPendingDelay();
+        return true;
     }
 
     public async Task<int> SetLatestAnalysisPointAsync(CancellationToken cancellationToken = default)
@@ -102,36 +150,72 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
     public async Task<string> AnalyzeNowAsync(CancellationToken cancellationToken = default)
     {
         if (!_qwenPaw.IsAuthenticated) throw new InvalidOperationException("尚未登录 QwenPaw。");
-        if (WhitelistLoader is not null)
-            Whitelist = await WhitelistLoader(cancellationToken);
 
-        var accounts = await _weChat.GetAccountsAsync(cancellationToken);
-        await _cursorOperationGate.WaitAsync(cancellationToken);
+        if (!await TryEnterRoundAsync(cancellationToken))
+        {
+            var queued = RequestImmediateRun();
+            throw new WeChatAnalysisRoundInProgressException(queued
+                ? "已有微信分析正在执行，本次请求已排队，当前轮次结束后会立即自动补跑。"
+                : "已有微信分析正在执行，请稍后再试。");
+        }
+
         try
         {
-            var workItems = await CollectWorkItemsAsync(accounts, cancellationToken);
-            if (workItems.Count == 0)
-                throw new InvalidOperationException("匹配的微信会话没有可分析的新消息。");
-            return await AnalyzeWorkItemsAsync(workItems, cancellationToken);
+            var progress = _coordinator.BeginProgress("微信账号", "最近会话");
+            if (WhitelistLoader is not null)
+                Whitelist = await WhitelistLoader(cancellationToken);
+
+            var accounts = await _weChat.GetAccountsAsync(cancellationToken);
+            return await RunRoundAsync(accounts, progress, cancellationToken);
         }
         finally
         {
-            _cursorOperationGate.Release();
+            ExitRound();
         }
+    }
+
+    private async Task<bool> TryEnterRoundAsync(CancellationToken cancellationToken)
+    {
+        if (!await _cursorOperationGate.WaitAsync(RoundHandoffTimeout, cancellationToken))
+            return false;
+
+        Interlocked.Increment(ref _roundRunningCount);
+        return true;
+    }
+
+    private void ExitRound()
+    {
+        Interlocked.Decrement(ref _roundRunningCount);
+        _cursorOperationGate.Release();
+    }
+
+    private async Task<string> RunRoundAsync(
+        IReadOnlyList<ChatAccount> accounts,
+        AnalysisProgressTracker progress,
+        CancellationToken cancellationToken)
+    {
+        progress.Complete("read-account", $"已读取 {accounts.Count} 个微信账号");
+        var workItems = await CollectWorkItemsAsync(accounts, progress, cancellationToken);
+        if (workItems.Count == 0)
+        {
+            progress.Finish("白名单会话没有待分析的新消息。");
+            throw new NoPendingWeChatMessagesException("匹配的微信会话没有可分析的新消息。");
+        }
+
+        return await AnalyzeWorkItemsAsync(workItems, progress, cancellationToken);
     }
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
         while (true)
         {
-            await Task.Delay(Interval, cancellationToken);
+            if (!_immediateRunRequested && !await WaitForNextRoundAsync(cancellationToken)) return;
+            _immediateRunRequested = false;
+
             try
             {
-                if (!_qwenPaw.IsAuthenticated) continue;
-                if (WhitelistLoader is not null)
-                    Whitelist = await WhitelistLoader(cancellationToken);
-                var accounts = await _weChat.GetAccountsAsync(cancellationToken);
-                await ProcessRoundAsync(accounts, cancellationToken);
+                if (_qwenPaw.IsAuthenticated)
+                    await ProcessRoundAsync(cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
             catch (Exception ex)
@@ -143,25 +227,67 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
         }
     }
 
+    /// <summary>等待下一轮间隔；返回 false 表示调度器已停止，排队请求会跳过等待立即执行。</summary>
+    private async Task<bool> WaitForNextRoundAsync(CancellationToken cancellationToken)
+    {
+        while (!_immediateRunRequested)
+        {
+            CancellationTokenSource delayCts;
+            lock (_delayGate)
+            {
+                _delayCts?.Dispose();
+                delayCts = _delayCts = new CancellationTokenSource();
+            }
+            using var delayToken = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, delayCts.Token);
+            try
+            {
+                await Task.Delay(Interval, delayToken.Token);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                if (cancellationToken.IsCancellationRequested) return false;
+            }
+        }
+
+        return true;
+    }
+
     private static TimeSpan GetConfiguredInterval(WeChatAnalysisSettings settings)
         => TimeSpan.FromMinutes(WeChatAnalysisSettings.NormalizeAnalysisIntervalMinutes(settings.AnalysisIntervalMinutes));
 
-    private async Task ProcessRoundAsync(IReadOnlyList<ChatAccount> accounts, CancellationToken cancellationToken)
+    private async Task ProcessRoundAsync(CancellationToken cancellationToken)
     {
-        await _cursorOperationGate.WaitAsync(cancellationToken);
+        if (!await TryEnterRoundAsync(cancellationToken))
+        {
+            // 手动分析占用中，等它结束后立即补跑，不丢掉这一轮。
+            _immediateRunRequested = true;
+            return;
+        }
+
         try
         {
-            var workItems = await CollectWorkItemsAsync(accounts, cancellationToken);
-            if (workItems.Count > 0)
-                await AnalyzeWorkItemsAsync(workItems, cancellationToken);
+            var progress = _coordinator.BeginProgress("微信账号", "自动增量分析");
+            if (WhitelistLoader is not null)
+                Whitelist = await WhitelistLoader(cancellationToken);
+
+            var accounts = await _weChat.GetAccountsAsync(cancellationToken);
+            await RunRoundAsync(accounts, progress, cancellationToken);
+        }
+        catch (NoPendingWeChatMessagesException)
+        {
+            // 自动轮询没有新消息属于正常情况，不产生失败通知。
         }
         finally
         {
-            _cursorOperationGate.Release();
+            ExitRound();
         }
     }
 
-    private async Task<string> AnalyzeWorkItemsAsync(IReadOnlyList<WeChatAnalysisWorkItem> workItems, CancellationToken cancellationToken)
+    private async Task<string> AnalyzeWorkItemsAsync(
+        IReadOnlyList<WeChatAnalysisWorkItem> workItems,
+        AnalysisProgressTracker progress,
+        CancellationToken cancellationToken)
         => await _coordinator.AnalyzeIncrementalRoundAsync(
             workItems,
             AgentId,
@@ -171,23 +297,49 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
                     SaveCursor(item.CursorKey, item.Cursor);
                 return Task.CompletedTask;
             },
+            progress,
             cancellationToken);
 
     private async Task<IReadOnlyList<WeChatAnalysisWorkItem>> CollectWorkItemsAsync(
         IReadOnlyList<ChatAccount> accounts,
+        AnalysisProgressTracker progress,
         CancellationToken cancellationToken)
     {
-        var workItems = new List<WeChatAnalysisWorkItem>();
+        var targets = new List<(ChatAccount Account, ChatSession Session)>();
+        progress.Start("read-session", "正在读取微信会话并按白名单筛选");
         foreach (var account in accounts)
         {
             var sessions = await _weChat.GetSessionsAsync(account.Id, cancellationToken);
-            foreach (var session in sessions)
+            progress.SetContext(account.DisplayName, $"共 {sessions.Count} 个会话");
+            targets.AddRange(sessions
+                .Where(session => WeChatAnalysisSelection.IsSessionAllowed(session, Settings, Whitelist))
+                .Select(session => (account, session)));
+        }
+        progress.Complete("read-session", $"白名单命中 {targets.Count} 个会话");
+
+        var workItems = new List<WeChatAnalysisWorkItem>();
+        var lastReportAt = DateTimeOffset.MinValue;
+        for (var index = 0; index < targets.Count; index++)
+        {
+            var (account, session) = targets[index];
+            var workItem = await PrepareSessionAsync(account, session, cancellationToken);
+            if (workItem is not null)
+                workItems.Add(workItem);
+
+            var isLast = index == targets.Count - 1;
+            if (isLast || DateTimeOffset.UtcNow - lastReportAt >= CollectionReportInterval)
             {
-                var workItem = await PrepareSessionAsync(account, session, cancellationToken);
-                if (workItem is not null)
-                    workItems.Add(workItem);
+                lastReportAt = DateTimeOffset.UtcNow;
+                progress.SetContext(account.DisplayName, session.DisplayName);
+                progress.Start(
+                    "read-messages",
+                    $"正在比对分析点（{index + 1}/{targets.Count}，{workItems.Count} 个会话有新消息）");
             }
         }
+
+        if (targets.Count > 0)
+            progress.Complete("read-messages", $"已比对 {targets.Count} 个会话，{workItems.Count} 个会话有新消息");
+
         return workItems;
     }
 
@@ -253,5 +405,10 @@ public sealed class IncrementalAnalysisScheduler : IAsyncDisposable
             try { await _worker; } catch (OperationCanceledException) { }
         }
         _cts?.Dispose();
+        lock (_delayGate)
+        {
+            _delayCts?.Dispose();
+            _delayCts = null;
+        }
     }
 }

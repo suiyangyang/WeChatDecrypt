@@ -63,6 +63,14 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+dist/
+.edit-scratch/
+.omo/
+/output/
+/WeChatDataAnalysisRelease/WeChatDataAnalysis/open-output.cmd
+/WeChatDataAnalysisRelease/WeChatDataAnalysis/output-location.path
+/WeChatDataAnalysisRelease/WeChatDataAnalysis/output-location.txt
+/WeChatDataAnalysisRelease/WeChatDataAnalysis/resources/backend/native/weflow_wasm/sns_image_fixture.json
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt

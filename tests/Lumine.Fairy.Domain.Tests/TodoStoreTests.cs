@@ -125,6 +125,11 @@ public sealed class TodoStoreTests
                 CompanyName = "示例公司",
                 DueAt = DateTimeOffset.UtcNow.AddDays(1),
                 Assignee = "张三",
+                FileReferences =
+                [
+                    new TodoFileReference("C:/Programs/Example.txt"),
+                    new TodoFileReference("C:/ProgramData/", true),
+                ],
             });
 
             Assert.NotNull(updated);
@@ -135,6 +140,10 @@ public sealed class TodoStoreTests
             Assert.Equal("company-1", updated.CompanyId);
             Assert.Equal("示例公司", updated.CompanyName);
             Assert.Equal("张三", updated.Assignee);
+            Assert.Equal(
+                ["C:/Programs/Example.txt", "C:/ProgramData/"],
+                updated.FileReferences!.Select(reference => reference.Path).ToArray());
+            Assert.True(updated.FileReferences[1].IsDirectory);
             Assert.Equal("pending", updated.Status);
             Assert.Equal(createdAt, updated.CreatedAt);
             Assert.Equal("wechat-analysis", updated.Source);
@@ -338,6 +347,7 @@ public sealed class TodoStoreTests
             Assert.Equal("default", migrated!.BoardId);
             Assert.Equal("todo", migrated.ListId);
             Assert.False(migrated.IsArchived);
+            Assert.Empty(migrated.FileReferences!);
         }
         finally
         {

@@ -6,10 +6,18 @@ public interface INotificationStore
 {
     Task<NotificationRecord> AddAsync(NotificationRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NotificationRecord>> ListAsync(string? keyword = null, bool unreadOnly = false, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<NotificationRecord>> ListPageAsync(string? keyword, bool unreadOnly, bool readOnly, int offset, int limit, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<NotificationRecord>> ListPageAsync(
+        string? keyword,
+        bool unreadOnly,
+        bool readOnly,
+        DateTimeOffset? beforeCreatedAt,
+        string? beforeId,
+        int limit,
+        bool workPageOnly = false,
+        CancellationToken cancellationToken = default);
     Task<bool> MarkReadAsync(string id, CancellationToken cancellationToken = default);
     Task<int> MarkAllReadAsync(CancellationToken cancellationToken = default);
-    Task<bool> ResolveAsync(string id, CancellationToken cancellationToken = default);
+    Task<bool> ResolveAsync(string id, string? resolvedLabel = null, CancellationToken cancellationToken = default);
     Task<NotificationRecord?> GetAsync(string id, CancellationToken cancellationToken = default);
     Task<NotificationRecord?> GetByDeduplicationKeyAsync(string key, CancellationToken cancellationToken = default);
 }
@@ -22,6 +30,7 @@ public interface ITodoStore
     Task<TodoRecord?> UpdateStatusAsync(string id, string status, CancellationToken cancellationToken = default);
     Task<TodoRecord?> UpdateDetailsAsync(TodoRecord todo, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default);
+    Task<int> DeleteArchivedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default);
     Task<TodoRecord?> MoveAsync(string todoId, string boardId, string listId, int position, string? status = null, CancellationToken cancellationToken = default);
     Task<TodoBoardRecord> GetBoardAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TodoListRecord>> ListListsAsync(string boardId, bool includeArchived = false, CancellationToken cancellationToken = default);
@@ -38,7 +47,7 @@ public interface IQwenPawClient
     string? Username { get; }
     Task<QwenPawLoginResult> LoginAsync(string baseUrl, string username, string password, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<QwenPawAgent>> GetAgentsAsync(CancellationToken cancellationToken = default);
-    Task CreateSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default);
+    Task CreateSessionAsync(string agentId, string sessionId, string title, CancellationToken cancellationToken = default);
     Task<QwenPawChatResult> ChatAsync(string agentId, string input, CancellationToken cancellationToken = default);
     Task<QwenPawChatResult> ChatAsync(string agentId, string input, string? sessionId, CancellationToken cancellationToken = default);
     Task RenameSessionAsync(string sessionId, string title, CancellationToken cancellationToken = default);
@@ -82,6 +91,15 @@ public interface IProtectedTokenStore
     Task ClearAsync(CancellationToken cancellationToken = default);
 }
 
+public sealed record QwenPawCredential(string ServerUrl, string Username, string Password);
+
+public interface IQwenPawCredentialStore
+{
+    Task SaveAsync(QwenPawCredential credential, CancellationToken cancellationToken = default);
+    Task<QwenPawCredential?> LoadAsync(CancellationToken cancellationToken = default);
+    Task ClearAsync(CancellationToken cancellationToken = default);
+}
+
 public sealed class NotificationService(INotificationStore store)
 {
     public event EventHandler<NotificationRecord>? NotificationAdded;
@@ -96,8 +114,16 @@ public sealed class NotificationService(INotificationStore store)
     public Task<IReadOnlyList<NotificationRecord>> ListAsync(string? keyword = null, bool unreadOnly = false, CancellationToken cancellationToken = default)
         => store.ListAsync(keyword, unreadOnly, cancellationToken);
 
-    public Task<IReadOnlyList<NotificationRecord>> ListPageAsync(string? keyword, bool unreadOnly, bool readOnly, int offset, int limit, CancellationToken cancellationToken = default)
-        => store.ListPageAsync(keyword, unreadOnly, readOnly, offset, limit, cancellationToken);
+    public Task<IReadOnlyList<NotificationRecord>> ListPageAsync(
+        string? keyword,
+        bool unreadOnly,
+        bool readOnly,
+        DateTimeOffset? beforeCreatedAt,
+        string? beforeId,
+        int limit,
+        bool workPageOnly = false,
+        CancellationToken cancellationToken = default)
+        => store.ListPageAsync(keyword, unreadOnly, readOnly, beforeCreatedAt, beforeId, limit, workPageOnly, cancellationToken);
 
     public Task<bool> MarkReadAsync(string id, CancellationToken cancellationToken = default)
         => store.MarkReadAsync(id, cancellationToken);
@@ -105,8 +131,8 @@ public sealed class NotificationService(INotificationStore store)
     public Task<int> MarkAllReadAsync(CancellationToken cancellationToken = default)
         => store.MarkAllReadAsync(cancellationToken);
 
-    public Task<bool> ResolveAsync(string id, CancellationToken cancellationToken = default)
-        => store.ResolveAsync(id, cancellationToken);
+    public Task<bool> ResolveAsync(string id, string? resolvedLabel = null, CancellationToken cancellationToken = default)
+        => store.ResolveAsync(id, resolvedLabel, cancellationToken);
 
     public Task<NotificationRecord?> GetAsync(string id, CancellationToken cancellationToken = default)
         => store.GetAsync(id, cancellationToken);
@@ -114,6 +140,8 @@ public sealed class NotificationService(INotificationStore store)
     public Task<NotificationRecord?> GetByDeduplicationKeyAsync(string key, CancellationToken cancellationToken = default)
         => store.GetByDeduplicationKeyAsync(key, cancellationToken);
 }
+
+public sealed record ArchivedTodoCleanupResult(int DeletedCount, int RetentionDays, DateTimeOffset Cutoff);
 
 public sealed class TodoService(ITodoStore store)
 {
@@ -173,6 +201,14 @@ public sealed class TodoService(ITodoStore store)
 
     public Task<bool> DeleteAsync(string id, CancellationToken cancellationToken = default)
         => store.DeleteAsync(id, cancellationToken);
+
+    public async Task<ArchivedTodoCleanupResult> CleanupArchivedAsync(int retentionDays, DateTimeOffset? now = null, CancellationToken cancellationToken = default)
+    {
+        var normalizedDays = WorkSettings.NormalizeArchivedRetentionDays(retentionDays);
+        var cutoff = ArchivedTodoCleanupPolicy.GetCutoff(now ?? DateTimeOffset.UtcNow, normalizedDays);
+        var deletedCount = await store.DeleteArchivedBeforeAsync(cutoff, cancellationToken);
+        return new ArchivedTodoCleanupResult(deletedCount, normalizedDays, cutoff);
+    }
 
     public async Task<TodoRecord?> MoveAsync(string todoId, string boardId, string listId, int position, string? status = null, CancellationToken cancellationToken = default)
     {
